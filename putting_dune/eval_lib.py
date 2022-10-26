@@ -107,7 +107,8 @@ def evaluate(
 
     if video_save_dir is not None:
       anim = plotting_utils.generate_video_from_simulator_events(
-          observers['event_observer'].events, env._goal_pos_material_frame  # pylint: disable=protected-access
+          observers['event_observer'].events,
+          env.goal.goal_position_material_frame,  # pylint: disable=protected-access
       )
       anim.save(os.path.join(video_save_dir, f'{seed}.gif'))
 

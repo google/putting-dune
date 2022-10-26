@@ -233,8 +233,10 @@ class PristineSingleDopedGraphene(Material):
       rng: np.random.Generator,
       *,
       predict_rates: RatePredictionFn = HumanPriorRatePredictor().predict,
+      grid_columns: int = 50,
   ):
     self.rng = rng
+    self._grid_columns = grid_columns
 
     # Set in reset, declared here to help type-checkers.
     self.atom_positions: np.ndarray
@@ -245,7 +247,7 @@ class PristineSingleDopedGraphene(Material):
     self.reset()
 
   def reset(self) -> None:
-    grid = _generate_hexagonal_grid()
+    grid = _generate_hexagonal_grid(self._grid_columns)
 
     # Scale the grid to have the correct cell distance.
     grid = grid * CARBON_BOND_DISTANCE_ANGSTROMS

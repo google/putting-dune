@@ -15,6 +15,7 @@
 # pyformat: mode=pyink
 """Putting Dune Environment for use with RL agents."""
 
+import dataclasses
 import datetime as dt
 import enum
 from typing import Optional
@@ -34,6 +35,129 @@ from shapely import geometry
 class RatePredictorType(str, enum.Enum):
   PRIOR = 'prior'
   SIMPLE = 'simple'
+
+
+@dataclasses.dataclass(frozen=True)
+class GoalReturn:
+  reward: float
+  is_terminal: bool
+  is_truncated: bool
+
+
+# TODO(joshgreaves): Eventually add interface for this.
+class SingleSiliconGoalReaching:
+  """A single silicon goal-reaching goal."""
+
+  def __init__(self):
+    # For now, require only that we reach the goal. This makes
+    # the problem much less sparse, especially under the
+    # relative-to-silicon action adapter.
+    self._required_consecutive_goal_steps_for_termination = 1
+
+    # Will be set on reset.
+    self.goal_position_material_frame = np.zeros((2,), dtype=np.float32)
+    self._consecutive_goal_steps = 0
+
+  def reset(
+      self,
+      rng: np.random.Generator,
+      initial_observation: simulator_utils.SimulatorObservation,
+      sim: simulator.PuttingDuneSimulator,
+  ):
+    """Resets the goal, picking a new position.
+
+    Args:
+      rng: The RNG to use for sampling a new goal.
+      initial_observation: The initial simulator observation.
+      sim: The simulator in use.
+    """
+    del initial_observation  # Unused.
+
+    # An easy way to pick a goal that is not near an adge is to contract
+    # all the points, and then pick from the contracted points, and finally
+    # pick the closest original point to the selected contracted point.
+    max_atom_l2_distance = np.max(
+        np.linalg.norm(sim.material.atom_positions, axis=1)
+    )
+    contraction = (
+        1 - 8 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS / max_atom_l2_distance
+    )
+    # Some very small grids might have a negative contraction, so clip it.
+    contraction = max(contraction, 0.1)
+    assert contraction < 1.0
+    contracted_points = sim.material.atom_positions * contraction
+
+    # Randomly select from the contracted points.
+    num_atoms, _ = contracted_points.shape
+    goal_position = contracted_points[rng.choice(num_atoms, 1)]
+
+    # Pick the point on the lattice closest to the contracted goal position.
+    _, neighbor_indices = sim.material.nearest_neighbors.kneighbors(
+        goal_position.reshape(1, 2)
+    )
+    self.goal_position_material_frame = sim.material.atom_positions[
+        neighbor_indices[0, 0]
+    ]
+
+    self._consecutive_goal_steps = 0
+
+  def caluclate_reward_and_terminal(
+      self,
+      observation: simulator_utils.SimulatorObservation,
+      sim: simulator.PuttingDuneSimulator,
+  ) -> GoalReturn:
+    """Calculates the reward and terminal signals for the goal.
+
+    Note: we assume that this is called once per simulator/agent step.
+
+    Args:
+      observation: The last observation from the simulator.
+      sim: The simulator being used.
+
+    Returns:
+      The reward, and whether the episode is terminal or should be
+        truncated. Truncation happens when atoms get to the edge of
+        the material and we can no longer simulate.
+    """
+    del observation  # Unused.
+
+    # Calculate the reward.
+    silicon_position_material_frame = sim.material.get_silicon_position()
+    cost = np.linalg.norm(
+        silicon_position_material_frame - self.goal_position_material_frame
+    )
+
+    # Update whether the silicon is near the goal.
+    goal_radius = graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
+    silicon_position_material_frame = sim.material.get_silicon_position()
+    goal_distance = np.linalg.norm(
+        silicon_position_material_frame - self.goal_position_material_frame
+    )
+    if goal_distance < goal_radius:
+      self._consecutive_goal_steps += 1
+    else:
+      self._consecutive_goal_steps = 0
+
+    # Calculate whether it is a terminal state.
+    is_terminal = (
+        self._consecutive_goal_steps
+        >= self._required_consecutive_goal_steps_for_termination
+    )
+
+    # Truncate if near the graphene edge.
+    si_neighbor_distances, _ = sim.material.nearest_neighbors.kneighbors(
+        silicon_position_material_frame.reshape(1, 2)
+    )
+
+    # If any of the neighbors are much greater than the expected bond distance,
+    # then there aren't three neighbors and we're at the edge.
+    # Since the neighbors are sorted, just look at the furthest neighbor.
+    is_truncation = (
+        si_neighbor_distances[0, -1]
+        > graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 1.1
+    )
+
+    return GoalReturn(-cost, is_terminal, is_truncation)
 
 
 class PuttingDuneEnvironment(dm_env.Environment):
@@ -57,21 +181,14 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapters.RelativeToSiliconActionAdapter()
+    self.goal = SingleSiliconGoalReaching()
 
     # Variables that will be set on reset.
-    self._goal_pos_material_frame = np.zeros((2,), dtype=np.float32)
     self._last_simulator_observation = simulator_utils.SimulatorObservation(
         simulator_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14])),
         None,
         dt.timedelta(seconds=0),
     )
-
-    # TODO(joshgreaves): Maybe abstract out into separate class
-    self._consecutive_goal_steps = 0
-    # For now, require only that we reach the goal. This makes
-    # the problem much less sparse, especially under the
-    # relative-to-silicon action adapter.
-    self._required_consecutive_goal_steps_for_termination = 1
 
     # We need to reset if:
     #   1. We have just made the environment and reset has not been called yet.
@@ -89,6 +206,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     if hasattr(self._action_adapter, 'rng'):
       self._action_adapter.rng = self._rng
 
+  # TODO(joshgreaves): Abstract into ObservationConstructor.
   def _make_observation(self):
     silicon_position = graphene.get_silicon_positions(
         self._last_simulator_observation.grid
@@ -101,10 +219,14 @@ class PuttingDuneEnvironment(dm_env.Environment):
           self._last_simulator_observation.last_probe_position
       )
 
+    # TODO(joshgreaves): Remove tight coupling to SinglSiliconGoalReaching.
+    # This won't be a problem once we abstract this into a separate
+    # class, since we can allow a suite of tightly-coupled items.
     silicon_position_material_frame = self.sim.material.get_silicon_position()
     goal_delta_material_frame = (
-        self._goal_pos_material_frame - silicon_position_material_frame
+        self.goal.goal_position_material_frame - silicon_position_material_frame
     )
+    # TODO(joshgreaves): Maybe clip, or saturate in some way.
     goal_delta_microscope_frame = np.asarray(
         self.sim.convert_point_to_microscope_frame(
             geometry.Point(goal_delta_material_frame)
@@ -117,27 +239,6 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     return obs.astype(np.float32)
 
-  def _make_reward(self):
-    # Distance between silicon and target position.
-    silicon_position_material_frame = self.sim.material.get_silicon_position()
-    cost = np.linalg.norm(
-        silicon_position_material_frame - self._goal_pos_material_frame
-    )
-
-    # TODO(joshgreaves): Maybe re-enable regularizer.
-    # Regularizer for beam to stay close to Silicone atom.
-    # if hasattr(self._action_adapter, 'beam_pos'):
-    #   cost += 0.05 * np.linalg.norm(
-    #       self.sim.si_pos - self._action_adapter.beam_pos)
-
-    return -cost
-
-  def _is_terminal(self):
-    return (
-        self._consecutive_goal_steps
-        >= self._required_consecutive_goal_steps_for_termination
-    )
-
   def reset(self) -> dm_env.TimeStep:
     # We won't need to reset immediately.
     self._requires_reset = False
@@ -145,16 +246,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # Generate a realistic doped graphene configuration.
     self._last_simulator_observation = self.sim.reset()
     self._action_adapter.reset()
-
-    # Pick a random grid position as the goal position.
-    # TODO(joshgreaves): Make sure to pick a point that isn't near the edge.
-    # TODO(joshgreaves): This requires reaching into the simulator, which
-    # won't work when we swap out for the real thing.
-    self._goal_pos_material_frame = self.sim.material.atom_positions[
-        self._rng.integers(self.sim.material.atom_positions.shape[0]), :
-    ]
-
-    self._consecutive_goal_steps = 0
+    self.goal.reset(self._rng, self._last_simulator_observation, self.sim)
 
     return dm_env.TimeStep(
         step_type=dm_env.StepType.FIRST,
@@ -185,36 +277,21 @@ class PuttingDuneEnvironment(dm_env.Environment):
     observation = self._make_observation()
 
     # 4. Calculate the reward (and terminal?) using RewardFunction.
-    # Perhaps never terminate to teach the agent to keep the Silicone at goal?
-    reward = self._make_reward()
-
-    # 5. Decide whether this is a terminal state.
-    # TODO(joshgreaves): If we work with materials other than graphene,
-    # we will need to find a way to set the goal radius.
-    goal_radius = graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
-    silicon_position_material_frame = self.sim.material.get_silicon_position()
-    goal_distance = np.linalg.norm(
-        silicon_position_material_frame - self._goal_pos_material_frame
+    # Perhaps never terminate to teach the agent to keep the silicon at goal?
+    goal_return = self.goal.caluclate_reward_and_terminal(
+        self._last_simulator_observation, self.sim
     )
-    if goal_distance < goal_radius:
-      self._consecutive_goal_steps += 1
-    else:
-      self._consecutive_goal_steps = 0
 
-    step_type = dm_env.StepType.MID
+    # TODO(joshgreaves): Make discount configurable.
     discount = 0.99
-    if self._is_terminal():
+    if goal_return.is_terminal:
       self._requires_reset = True
-      step_type = dm_env.StepType.LAST
-      discount = 0.0
+      return dm_env.termination(goal_return.reward, observation)
+    elif goal_return.is_truncated:
+      self._requires_reset = True
+      return dm_env.truncation(goal_return.reward, observation, discount)
 
-    # 5. Return the information as a timestep.
-    return dm_env.TimeStep(
-        step_type=step_type,
-        reward=reward,
-        discount=discount,
-        observation=observation,
-    )
+    return dm_env.transition(goal_return.reward, observation, discount)
 
   def action_spec(self) -> specs.BoundedArray:
     return self._action_adapter.action_spec
@@ -233,7 +310,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
       beam_position = np.asarray(beam_position)
     goal_position = np.asarray(
         self.sim.convert_point_to_microscope_frame(
-            geometry.Point(self._goal_pos_material_frame)
+            geometry.Point(self.goal.goal_position_material_frame)
         )
     )
 
