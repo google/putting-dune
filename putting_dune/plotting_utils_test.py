@@ -12,37 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Entry point for standalone evaluation."""
+"""Tests for plotting_utils."""
 
-import dataclasses
-from typing import Optional
+from absl.testing import absltest
 
-from absl import app
-from etils import eapp
+from matplotlib import animation
 import numpy as np
 from putting_dune import agent_lib
-from putting_dune import eval_lib
+from putting_dune import plotting_utils
 from putting_dune import run_helpers
+from putting_dune import simulator_observers
 
 
-@dataclasses.dataclass
-class Args:
-  """Command line arguments."""
-  video_save_dir: Optional[str] = None
-
-
-def main(args: Args) -> None:
-  # Set up the environment.
-  # Note: We pass in an arbitrary seed here, since evaluate will
-  # pass in a specific seed for each episode.
-  env = run_helpers.create_putting_dune_env(seed=0)
-
-  # Set up the agent.
-  # TODO(joshgreaves): Pass seed in for agent.
+def _generate_events_with_random_policy(
+) -> list[simulator_observers.SimulatorEvent]:
+  env = run_helpers.create_putting_dune_env(seed=0, step_limit=5)
   rng = np.random.default_rng(0)
 
-  # For now we assume that the action_spec min and max are floats.
-  # However, this may change.
   action_spec = env.action_spec()
   # These are actually np arrays with a single value, so unpack the float.
   action_minimum = action_spec.minimum.item()
@@ -53,16 +39,26 @@ def main(args: Args) -> None:
   agent = agent_lib.UniformRandomAgent(
       rng, action_minimum, action_maximum, action_spec.shape)
 
-  # Set up the eval suite.
-  # TODO(joshgreaves): Specify specific eval suites.
-  eval_suite = eval_lib.EvalSuite(tuple(range(10)))
+  event_observer = simulator_observers.EventObserver()
+  env.sim.add_observer(event_observer)
 
-  eval_lib.evaluate(
-      agent,
-      env,
-      eval_suite,
-      video_save_dir=args.video_save_dir)
+  timestep = env.reset()
+  while not timestep.last():
+    action = agent.step(timestep)
+    timestep = env.step(action)
+
+  return event_observer.events
+
+
+class EvalLibTest(absltest.TestCase):
+
+  def test_something(self):
+    events = _generate_events_with_random_policy()
+    anim = plotting_utils.generate_video_from_simulator_events(
+        events, goal_position=np.asarray([0.0, 0.0]))
+
+    self.assertIsInstance(anim, animation.Animation)
 
 
 if __name__ == '__main__':
-  app.run(main, flags_parser=eapp.make_flags_parser(Args))
+  absltest.main()

@@ -53,12 +53,13 @@ class EventObserver(simulator_utils.SimulatorObserver):
 
   def observe_reset(
       self,
-      grid: simulator_utils.AtomicGrid) -> None:
+      grid: simulator_utils.AtomicGrid,
+      fov: simulator_utils.SimulatorFieldOfView) -> None:
     event = SimulatorEvent(
         SimulatorEventType.RESET,
         dt.timedelta(seconds=0),
         dt.timedelta(seconds=0),
-        {'grid': grid})
+        {'grid': grid, 'fov': fov})
     self.events = [event]
 
   def observe_transition(

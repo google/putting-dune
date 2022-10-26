@@ -15,9 +15,13 @@
 """Functions for evaluating an agent."""
 
 import dataclasses
+import os
+from typing import Optional
 
+from absl import logging
 import dm_env
 from putting_dune import agent_lib
+from putting_dune import plotting_utils
 from putting_dune import putting_dune_environment
 from putting_dune import simulator_observers
 
@@ -39,24 +43,34 @@ class EvalResult:
 def evaluate(
     agent: agent_lib.Agent,
     env: putting_dune_environment.PuttingDuneEnvironment,
-    eval_suite: EvalSuite) -> list[EvalResult]:
+    eval_suite: EvalSuite,
+    *,
+    video_save_dir: Optional[str] = None) -> list[EvalResult]:
   """Evaluates an agent on the specified environment and evaluation suite.
 
   Args:
     agent: The agent to evluate.
     env: The PuttingDuneEnvironment to evaluate on.
     eval_suite: The evaluation suite to run.
+    video_save_dir: A directory to save videos of the evaluation runs at.
+      If set to None, then videos won't be generated. Generating videos
+      significantly slows down evaluation time.
 
   Returns:
     A list containing eval results, one for each seed in the eval_suite.
   """
   agent.set_mode(agent_lib.AgentMode.EVAL)
   results = []
+  observers = {}
 
-  event_observer = simulator_observers.EventObserver()
-  env.sim.add_observer(event_observer)
+  if video_save_dir is not None:
+    observers['event_observer'] = simulator_observers.EventObserver()
+
+  for observer in observers.values():
+    env.sim.add_observer(observer)
 
   for seed in eval_suite.seeds:
+    logging.info('Evaluating seed %d', seed)
     num_actions_taken = 0
     total_reward = 0.0
 
@@ -86,8 +100,13 @@ def evaluate(
         total_reward=total_reward)
     results.append(eval_result)
 
-    # TODO(joshgreaves): Now use the event_observer.events to generate plots.
+    if video_save_dir is not None:
+      anim = plotting_utils.generate_video_from_simulator_events(
+          observers['event_observer'].events,
+          env._goal_pos_material_frame)  # pylint: disable=protected-access
+      anim.save(os.path.join(video_save_dir, f'{seed}.gif'))
 
-  env.sim.remove_observer(event_observer)
+  for observer in observers.values():
+    env.sim.remove_observer(observer)
 
   return results

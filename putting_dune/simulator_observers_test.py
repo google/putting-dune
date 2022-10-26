@@ -29,7 +29,9 @@ class SimulatorObserversTest(absltest.TestCase):
     observer = simulator_observers.EventObserver()
 
     grid = simulator_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
-    observer.observe_reset(grid)
+    fov = simulator_utils.SimulatorFieldOfView(
+        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0)))
+    observer.observe_reset(grid, fov)
     observer.observe_apply_control(
         dt.timedelta(seconds=1.0),
         simulator_utils.SimulatorControl(
@@ -41,8 +43,7 @@ class SimulatorObserversTest(absltest.TestCase):
     observer.observe_take_image(
         dt.timedelta(seconds=4.0),
         dt.timedelta(seconds=4.0),
-        simulator_utils.SimulatorFieldOfView(
-            geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))))
+        fov)
 
     events = observer.events
     self.assertLen(events, 5)
@@ -65,14 +66,16 @@ class SimulatorObserversTest(absltest.TestCase):
   def test_event_observer_reset_resets_events(self):
     observer = simulator_observers.EventObserver()
     grid = simulator_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    fov = simulator_utils.SimulatorFieldOfView(
+        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0)))
 
-    observer.observe_reset(grid)
+    observer.observe_reset(grid, fov)
     observer.observe_transition(
         dt.timedelta(seconds=1.0), grid)
 
     self.assertLen(observer.events, 2)
 
-    observer.observe_reset(grid)
+    observer.observe_reset(grid, fov)
 
     self.assertLen(observer.events, 1)
 

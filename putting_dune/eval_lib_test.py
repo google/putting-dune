@@ -15,13 +15,16 @@
 """Tests for eval_lib."""
 
 import datetime as dt
+import os
 from unittest import mock
 
 from absl.testing import absltest
 import dm_env
+import numpy as np
 from putting_dune import agent_lib
 from putting_dune import eval_lib
 from putting_dune import putting_dune_environment
+from putting_dune import run_helpers
 
 
 _TERMINAL_STEP = dm_env.termination(0.0, None)
@@ -55,6 +58,28 @@ class EvalLibTest(absltest.TestCase):
     # Since step always returns terminal, it should be called the same
     # number of times as number of seeds we are evaluating on.
     self.assertEqual(self._mock_environment.step.call_count, num_seeds)
+
+  def test_eval_lib_generates_video_when_path_is_specified(self):
+    env = run_helpers.create_putting_dune_env(seed=0, step_limit=5)
+    rng = np.random.default_rng(0)
+
+    action_spec = env.action_spec()
+    # These are actually np arrays with a single value, so unpack the float.
+    action_minimum = action_spec.minimum.item()
+    action_maximum = action_spec.maximum.item()
+    assert isinstance(action_minimum, float)
+    assert isinstance(action_maximum, float)
+
+    agent = agent_lib.UniformRandomAgent(
+        rng, action_minimum, action_maximum, action_spec.shape)
+
+    tempdir = self.create_tempdir()
+    eval_lib.evaluate(
+        agent, env, eval_lib.EvalSuite((0,)), video_save_dir=tempdir.full_path)
+
+    files = os.listdir(tempdir.full_path)
+    self.assertLen(files, 1)  # There should be one file saved.
+    self.assertEqual(files[0], '0.gif')
 
 
 if __name__ == '__main__':

@@ -28,12 +28,13 @@ def create_putting_dune_env(
     seed: int,
     *,
     simulator_observers: Sequence[simulator_utils.SimulatorObserver] = (),
+    # 30 minutes, based on current exposure/image capturing times.
+    step_limit: int = 600,
 ) -> putting_dune_environment.PuttingDuneEnvironment:
   """Creates Putting Dune environment for RL experiments."""
   env = putting_dune_environment.PuttingDuneEnvironment()
   env = wrappers.SinglePrecisionWrapper(env)
-  # 30 minutes, based on current exposure/image capturing times.
-  env = wrappers.StepLimitWrapper(env, step_limit=600)
+  env = wrappers.StepLimitWrapper(env, step_limit=step_limit)
 
   # Before returning, cast the environment back to PuttingDuneEnvironment.
   # While not strictly true, it has the same public interface.

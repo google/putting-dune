@@ -220,7 +220,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
         self.sim.convert_point_to_microscope_frame(
             geometry.Point(self._goal_pos_material_frame)))
 
-    plotting_utils.plot_frame(
+    plotting_utils.plot_microscope_frame(
         ax,
         self._last_simulator_observation.grid,
         goal_position,

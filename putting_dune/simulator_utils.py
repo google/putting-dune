@@ -89,7 +89,7 @@ class SimulatorFieldOfView:
 class SimulatorObserver:
   """An observer interface for observing events in the simulator."""
 
-  def observe_reset(self, grid: AtomicGrid) -> None:
+  def observe_reset(self, grid: AtomicGrid, fov: SimulatorFieldOfView) -> None:
     pass
 
   def observe_apply_control(
