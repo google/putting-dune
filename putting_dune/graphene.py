@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Doped graphene materials."""
 
 import abc
@@ -43,14 +44,16 @@ class HumanPriorRatePredictor:
       located at (1, 0).
     cov: Assuming Gaussian falloff of transition rates, the covariance matrix
       describing the shape of the distribution.
-    max_rate: The maximum rate (as lambda of an exponential distribution) at
-      the center of the peak.
+    max_rate: The maximum rate (as lambda of an exponential distribution) at the
+      center of the peak.
   """
 
-  def __init__(self,
-               mean: np.ndarray = PRIOR_RATE_MEAN,
-               cov: np.ndarray = PRIOR_RATE_COV,
-               max_rate: float = PRIOR_MAX_RATE):
+  def __init__(
+      self,
+      mean: np.ndarray = PRIOR_RATE_MEAN,
+      cov: np.ndarray = PRIOR_RATE_COV,
+      max_rate: float = PRIOR_MAX_RATE,
+  ):
     self.mean = mean
     self.cov = cov
     self.max_rate = max_rate
@@ -81,13 +84,14 @@ class HumanPriorRatePredictor:
     relative_neighbor_positions = neighbor_positions - current_position
     angles = data_utils.get_neighbor_angles(relative_neighbor_positions)
 
-    relative_beam_position = (beam_pos - current_position)
+    relative_beam_position = beam_pos - current_position
     relative_beam_position /= CARBON_BOND_DISTANCE_ANGSTROMS
     rates = np.zeros((neighbor_indices.shape), dtype=float)
     for i, angle in enumerate(angles):
       rotated_mean = data_utils.rotate_coordinates(self.mean, -angle)
-      rate = data_utils.prior_rates(relative_beam_position, rotated_mean,
-                                    self.cov, self.max_rate)
+      rate = data_utils.prior_rates(
+          relative_beam_position, rotated_mean, self.cov, self.max_rate
+      )
       rates[i] = rate
 
     return rates
@@ -97,15 +101,16 @@ def simple_transition_rates(
     grid: simulator_utils.AtomicGrid,
     beam_pos: geometry.Point,
     current_position: np.ndarray,
-    neighbor_indices: np.ndarray) -> np.ndarray:
+    neighbor_indices: np.ndarray,
+) -> np.ndarray:
   """Computes rate constants for transitioning a Si atom.
 
   Args:
     grid: Atomic grid state.
     beam_pos: 2-dimensional beam position in [0, 1] coordinate frame.
     current_position: 2-dimensional position of the current silicon atom.
-    neighbor_indices: Indices of the atoms on the grid to calculate
-      rates for.
+    neighbor_indices: Indices of the atoms on the grid to calculate rates for.
+
   Returns:
     a 3-dimensional array of rate constants for transitioning to the 3
       nearest neighbors.
@@ -133,9 +138,8 @@ class Material(abc.ABC):
 
   @abc.abstractmethod
   def get_atoms_in_bounds(
-      self,
-      lower_left: geometry.Point,
-      upper_right: geometry.Point) -> simulator_utils.AtomicGrid:
+      self, lower_left: geometry.Point, upper_right: geometry.Point
+  ) -> simulator_utils.AtomicGrid:
     """Gets the atomic grid for a particular field of view.
 
     Args:
@@ -157,7 +161,8 @@ class Material(abc.ABC):
       self,
       control: simulator_utils.SimulatorControl,
       start_time: dt.timedelta,
-      observers: Iterable[simulator_utils.SimulatorObserver] = ()) -> None:
+      observers: Iterable[simulator_utils.SimulatorObserver] = (),
+  ) -> None:
     """Simulates controls applied to the material."""
 
   @property
@@ -186,7 +191,8 @@ def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
   num_rows = int(num_cols / ratio)
 
   coord_x, coord_y = np.meshgrid(
-      np.arange(num_cols), np.arange(num_rows), indexing='xy')
+      np.arange(num_cols), np.arange(num_rows), indexing='xy'
+  )
 
   # Generate the grid.
   coord_y = coord_y * ratio
@@ -204,16 +210,15 @@ def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
 
   return np.stack((coord_x, coord_y), axis=1)
 
+
 # A function that takes an atomic grid representing the current material
 # state, a probe position, a silicon atom position, and positions of the
 # 3 nearest neighbors, and returns the rate at which the silicon atom
 # swaps places with its nearest neighbors.
 RatePredictionFn = Callable[
-    [simulator_utils.AtomicGrid,
-     geometry.Point,
-     np.ndarray,
-     np.ndarray],
-    np.ndarray]
+    [simulator_utils.AtomicGrid, geometry.Point, np.ndarray, np.ndarray],
+    np.ndarray,
+]
 
 
 class PristineSingleDopedGraphene(Material):
@@ -227,7 +232,8 @@ class PristineSingleDopedGraphene(Material):
       self,
       rng: np.random.Generator,
       *,
-      predict_rates: RatePredictionFn = HumanPriorRatePredictor().predict):
+      predict_rates: RatePredictionFn = HumanPriorRatePredictor().predict,
+  ):
     self.rng = rng
 
     # Set in reset, declared here to help type-checkers.
@@ -250,9 +256,10 @@ class PristineSingleDopedGraphene(Material):
 
     # Apply a random rotation to the grid.
     rotation_angle = self.rng.uniform(0.0, 2 * np.pi)
-    rotation_matrix = np.asarray(
-        [[np.cos(rotation_angle), -np.sin(rotation_angle)],
-         [np.sin(rotation_angle), np.cos(rotation_angle)]])
+    rotation_matrix = np.asarray([
+        [np.cos(rotation_angle), -np.sin(rotation_angle)],
+        [np.sin(rotation_angle), np.cos(rotation_angle)],
+    ])
     # Apply the rotation matrix on the rhs, since grid is shape (num_atoms, 2).
     self.atom_positions = grid @ rotation_matrix
 
@@ -268,9 +275,8 @@ class PristineSingleDopedGraphene(Material):
     ).fit(self.atom_positions)
 
   def get_atoms_in_bounds(
-      self,
-      lower_left: geometry.Point,
-      upper_right: geometry.Point) -> simulator_utils.AtomicGrid:
+      self, lower_left: geometry.Point, upper_right: geometry.Point
+  ) -> simulator_utils.AtomicGrid:
     """Gets the atomic grid for a particular field of view.
 
     Args:
@@ -286,9 +292,12 @@ class PristineSingleDopedGraphene(Material):
     upper_right = np.asarray(upper_right)
 
     indices_in_bounds = np.all(
-        ((lower_left <= self.atom_positions)
-         & (self.atom_positions <= upper_right)),
-        axis=1)
+        (
+            (lower_left <= self.atom_positions)
+            & (self.atom_positions <= upper_right)
+        ),
+        axis=1,
+    )
 
     selected_atom_positions = self.atom_positions[indices_in_bounds]
     selected_atomic_numbers = self.atomic_numbers[indices_in_bounds]
@@ -296,28 +305,31 @@ class PristineSingleDopedGraphene(Material):
     # Normalize atom positions in [0, 1]
     delta = (upper_right - lower_left).reshape(1, -1)
     selected_atom_positions = (
-        (selected_atom_positions - lower_left.reshape(1, -1)) / delta)
+        selected_atom_positions - lower_left.reshape(1, -1)
+    ) / delta
 
     return simulator_utils.AtomicGrid(
-        selected_atom_positions, selected_atomic_numbers)
+        selected_atom_positions, selected_atomic_numbers
+    )
 
   def apply_control(
       self,
       control: simulator_utils.SimulatorControl,
       start_time: dt.timedelta,
-      observers: Iterable[simulator_utils.SimulatorObserver] = ()) -> None:
+      observers: Iterable[simulator_utils.SimulatorObserver] = (),
+  ) -> None:
     """Simulates applying a beam exposure to the material."""
     # There is a chance that, if the dwell time is long enough, there
     # will be multiple state transitions. We simulate these transitions
     # until the dwell time is over.
     elapsed_time = dt.timedelta(seconds=0)
     while elapsed_time < control.dwell_time:
-
       silicon_position = self.get_silicon_position()
 
       # Get silicon transition probabilities.
       _, si_neighbors_index = self.nearest_neighbors.kneighbors(
-          silicon_position.reshape(1, 2))
+          silicon_position.reshape(1, 2)
+      )
       # Get the nearest neighbors, ignore the atom itself.
       si_neighbors_index = si_neighbors_index[0, 1:]
 
@@ -325,7 +337,8 @@ class PristineSingleDopedGraphene(Material):
           simulator_utils.AtomicGrid(self.atom_positions, self.atomic_numbers),
           control.position,
           silicon_position,
-          si_neighbors_index)
+          si_neighbors_index,
+      )
       total_rate = np.sum(transition_rates)
 
       # The time at which the next transition takes place is modeled
@@ -353,14 +366,15 @@ class PristineSingleDopedGraphene(Material):
 
         for observer in observers:
           observer.observe_transition(
-              time=start_time + elapsed_time,
-              grid=self.atomic_grid)
+              time=start_time + elapsed_time, grid=self.atomic_grid
+          )
 
   @property
   def atomic_grid(self) -> simulator_utils.AtomicGrid:
     """Gets the atomic grid representing the current material state."""
     return simulator_utils.AtomicGrid(
-        self.atom_positions, np.copy(self.atomic_numbers))
+        self.atom_positions, np.copy(self.atomic_numbers)
+    )
 
   def get_silicon_position(self) -> np.ndarray:
     return self.atom_positions[self.atomic_numbers == SILICON].reshape(-1)

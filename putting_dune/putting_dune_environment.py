@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Putting Dune Environment for use with RL agents."""
 
 import datetime as dt
@@ -38,9 +39,9 @@ class RatePredictorType(str, enum.Enum):
 class PuttingDuneEnvironment(dm_env.Environment):
   """Putting Dune Environment."""
 
-  def __init__(self,
-               rate_predictor_type: RatePredictorType = RatePredictorType.PRIOR
-               ):
+  def __init__(
+      self, rate_predictor_type: RatePredictorType = RatePredictorType.PRIOR
+  ):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
@@ -51,8 +52,8 @@ class PuttingDuneEnvironment(dm_env.Environment):
       self.rate_predictor = graphene.simple_transition_rates
 
     self._material = graphene.PristineSingleDopedGraphene(
-        self._rng,
-        predict_rates=self.rate_predictor)
+        self._rng, predict_rates=self.rate_predictor
+    )
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapters.RelativeToSiliconActionAdapter()
@@ -62,7 +63,8 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._last_simulator_observation = simulator_utils.SimulatorObservation(
         simulator_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14])),
         None,
-        dt.timedelta(seconds=0))
+        dt.timedelta(seconds=0),
+    )
 
     # TODO(joshgreaves): Maybe abstract out into separate class
     self._consecutive_goal_steps = 0
@@ -89,23 +91,29 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
   def _make_observation(self):
     silicon_position = graphene.get_silicon_positions(
-        self._last_simulator_observation.grid).reshape(2)
+        self._last_simulator_observation.grid
+    ).reshape(2)
 
     if self._last_simulator_observation.last_probe_position is None:
       probe_position = getattr(self._action_adapter, 'beam_pos', np.zeros(2))
     else:
       probe_position = np.asarray(
-          self._last_simulator_observation.last_probe_position)
+          self._last_simulator_observation.last_probe_position
+      )
 
     silicon_position_material_frame = self.sim.material.get_silicon_position()
     goal_delta_material_frame = (
-        self._goal_pos_material_frame - silicon_position_material_frame)
+        self._goal_pos_material_frame - silicon_position_material_frame
+    )
     goal_delta_microscope_frame = np.asarray(
         self.sim.convert_point_to_microscope_frame(
-            geometry.Point(goal_delta_material_frame)))
+            geometry.Point(goal_delta_material_frame)
+        )
+    )
 
     obs = np.concatenate(
-        [silicon_position, probe_position, goal_delta_microscope_frame])
+        [silicon_position, probe_position, goal_delta_microscope_frame]
+    )
 
     return obs.astype(np.float32)
 
@@ -113,7 +121,8 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # Distance between silicon and target position.
     silicon_position_material_frame = self.sim.material.get_silicon_position()
     cost = np.linalg.norm(
-        silicon_position_material_frame - self._goal_pos_material_frame)
+        silicon_position_material_frame - self._goal_pos_material_frame
+    )
 
     # TODO(joshgreaves): Maybe re-enable regularizer.
     # Regularizer for beam to stay close to Silicone atom.
@@ -124,8 +133,10 @@ class PuttingDuneEnvironment(dm_env.Environment):
     return -cost
 
   def _is_terminal(self):
-    return (self._consecutive_goal_steps
-            >= self._required_consecutive_goal_steps_for_termination)
+    return (
+        self._consecutive_goal_steps
+        >= self._required_consecutive_goal_steps_for_termination
+    )
 
   def reset(self) -> dm_env.TimeStep:
     # We won't need to reset immediately.
@@ -140,7 +151,8 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # TODO(joshgreaves): This requires reaching into the simulator, which
     # won't work when we swap out for the real thing.
     self._goal_pos_material_frame = self.sim.material.atom_positions[
-        self._rng.integers(self.sim.material.atom_positions.shape[0]), :]
+        self._rng.integers(self.sim.material.atom_positions.shape[0]), :
+    ]
 
     self._consecutive_goal_steps = 0
 
@@ -160,11 +172,13 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # TODO(joshgreaves): Cache last probe position, and use it wherever
     # beam_position is required.
     simulator_control = self._action_adapter.get_action(
-        self._last_simulator_observation.grid, action)
+        self._last_simulator_observation.grid, action
+    )
 
     # 2. Step the simulator with the action returned from ActionAdapter.
-    self._last_simulator_observation = (
-        self.sim.step_and_image(simulator_control))
+    self._last_simulator_observation = self.sim.step_and_image(
+        simulator_control
+    )
 
     # 3. Create an observation with ObservationConstructor, using
     #    the new state returned from the simulator.
@@ -180,7 +194,8 @@ class PuttingDuneEnvironment(dm_env.Environment):
     goal_radius = graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
     silicon_position_material_frame = self.sim.material.get_silicon_position()
     goal_distance = np.linalg.norm(
-        silicon_position_material_frame - self._goal_pos_material_frame)
+        silicon_position_material_frame - self._goal_pos_material_frame
+    )
     if goal_distance < goal_radius:
       self._consecutive_goal_steps += 1
     else:
@@ -218,7 +233,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
       beam_position = np.asarray(beam_position)
     goal_position = np.asarray(
         self.sim.convert_point_to_microscope_frame(
-            geometry.Point(self._goal_pos_material_frame)))
+            geometry.Point(self._goal_pos_material_frame)
+        )
+    )
 
     plotting_utils.plot_microscope_frame(
         ax,

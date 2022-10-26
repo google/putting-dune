@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Shared utilities for simulator components."""
 
 import dataclasses
@@ -27,6 +28,7 @@ from shapely import geometry
 @dataclasses.dataclass(frozen=True)
 class AtomicGrid:
   """A grid of atoms."""
+
   atom_positions: np.ndarray
   atomic_numbers: np.ndarray
 
@@ -56,13 +58,15 @@ class SimulatorFieldOfView:
   beyond the field of view of the microscope. Thus, this class also
   contains convenience functions for moving between these coordinate spaces.
   """
+
   lower_left: geometry.Point
   upper_right: geometry.Point
 
   @property
   def offset(self) -> geometry.Point:
     return geometry.Point(
-        (np.asarray(self.lower_left) + np.asarray(self.upper_right)) / 2)
+        (np.asarray(self.lower_left) + np.asarray(self.upper_right)) / 2
+    )
 
   def microscope_grid_to_material_grid(self, grid: AtomicGrid) -> AtomicGrid:
     lower_left = np.asarray(self.lower_left).reshape(1, 2)
@@ -70,7 +74,8 @@ class SimulatorFieldOfView:
     scale = upper_right - lower_left
 
     return AtomicGrid(
-        grid.atom_positions * scale + lower_left, grid.atomic_numbers)
+        grid.atom_positions * scale + lower_left, grid.atomic_numbers
+    )
 
   def material_grid_to_microscope_grid(self, grid: AtomicGrid) -> AtomicGrid:
     lower_left = np.asarray(self.lower_left).reshape(1, 2)
@@ -78,7 +83,8 @@ class SimulatorFieldOfView:
     scale = upper_right - lower_left
 
     return AtomicGrid(
-        (grid.atom_positions - lower_left) / scale, grid.atomic_numbers)
+        (grid.atom_positions - lower_left) / scale, grid.atomic_numbers
+    )
 
   def __str__(self) -> str:
     ll = self.lower_left
@@ -93,12 +99,12 @@ class SimulatorObserver:
     pass
 
   def observe_apply_control(
-      self, start_time: dt.timedelta, control: SimulatorControl) -> None:
+      self, start_time: dt.timedelta, control: SimulatorControl
+  ) -> None:
     # end_time can be inferred from start_time and dwell_time.
     pass
 
-  def observe_transition(
-      self, time: dt.timedelta, grid: AtomicGrid) -> None:
+  def observe_transition(self, time: dt.timedelta, grid: AtomicGrid) -> None:
     # Transition assumed to be instantaneous.
     pass
 
@@ -106,5 +112,6 @@ class SimulatorObserver:
       self,
       start_time: dt.timedelta,
       end_time: dt.timedelta,
-      fov: SimulatorFieldOfView) -> None:
+      fov: SimulatorFieldOfView,
+  ) -> None:
     pass

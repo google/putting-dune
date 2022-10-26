@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for graphene."""
 
 import datetime as dt
@@ -24,7 +25,8 @@ from putting_dune import simulator_utils
 from shapely import geometry
 
 _ARBITRARY_CONTROL = simulator_utils.SimulatorControl(
-    geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0))
+    geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+)
 _ARBITRARY_TIME = dt.timedelta(seconds=1.0)
 
 
@@ -40,17 +42,21 @@ class GrapheneTest(absltest.TestCase):
     num_atoms = material.atom_positions.shape[0]
     chosen_idx = self.rng.choice(num_atoms)
     chosen_atom_position = material.atom_positions[chosen_idx].reshape(1, 2)
-    neighbor_distances, _ = (
-        material.nearest_neighbors.kneighbors(chosen_atom_position))
+    neighbor_distances, _ = material.nearest_neighbors.kneighbors(
+        chosen_atom_position
+    )
     neighbor_distances = neighbor_distances.reshape(-1)
 
     self.assertEqual(neighbor_distances[0], 0.0)  # Self-distance.
-    self.assertAlmostEqual(neighbor_distances[1],
-                           graphene.CARBON_BOND_DISTANCE_ANGSTROMS)
-    self.assertAlmostEqual(neighbor_distances[2],
-                           graphene.CARBON_BOND_DISTANCE_ANGSTROMS)
-    self.assertAlmostEqual(neighbor_distances[3],
-                           graphene.CARBON_BOND_DISTANCE_ANGSTROMS)
+    self.assertAlmostEqual(
+        neighbor_distances[1], graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
+    self.assertAlmostEqual(
+        neighbor_distances[2], graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
+    self.assertAlmostEqual(
+        neighbor_distances[3], graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
 
   def test_different_seeds_give_different_orientations_of_graphene(self):
     rng1 = np.random.default_rng(1)
@@ -67,10 +73,12 @@ class GrapheneTest(absltest.TestCase):
     chosen_atom_position2 = material2.atom_positions[chosen_idx2].reshape(1, 2)
 
     # Get the nearest neighbors for both atoms.
-    _, nearest_neighbors1 = (
-        material1.nearest_neighbors.kneighbors(chosen_atom_position1))
-    _, nearest_neighbors2 = (
-        material1.nearest_neighbors.kneighbors(chosen_atom_position1))
+    _, nearest_neighbors1 = material1.nearest_neighbors.kneighbors(
+        chosen_atom_position1
+    )
+    _, nearest_neighbors2 = material1.nearest_neighbors.kneighbors(
+        chosen_atom_position1
+    )
 
     # Remove the self atom in the nearest neighbors.
     nearest_neighbors1 = nearest_neighbors1.reshape(-1)
@@ -103,8 +111,8 @@ class GrapheneTest(absltest.TestCase):
   def test_human_prior_rates(self):
     transition_model = graphene.HumanPriorRatePredictor()
     material = graphene.PristineSingleDopedGraphene(
-        self.rng,
-        predict_rates=transition_model.predict)
+        self.rng, predict_rates=transition_model.predict
+    )
 
     material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
 
@@ -112,9 +120,10 @@ class GrapheneTest(absltest.TestCase):
     material = graphene.PristineSingleDopedGraphene(self.rng)
 
     lower_left = geometry.Point((0.0, 0.0))
-    upper_right = geometry.Point(
-        (2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
-         2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS))
+    upper_right = geometry.Point((
+        2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+        2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+    ))
     grid = material.get_atoms_in_bounds(lower_left, upper_right)
 
     # We are getting a 2 unit cell by 2 unit cell distance.
@@ -126,19 +135,22 @@ class GrapheneTest(absltest.TestCase):
       self.assertBetween(
           atom_position[0],  # Check x is in bounds.
           0.0,
-          2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS)
+          2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+      )
       self.assertBetween(
           atom_position[1],  # Check y is in bounds.
           0.0,
-          2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS)
+          2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+      )
 
   def test_get_atoms_in_bounds_correctly_normalizes_points_in_unit_square(self):
     material = graphene.PristineSingleDopedGraphene(self.rng)
 
     lower_left = geometry.Point((-10.0, -10.0))
-    upper_right = geometry.Point(
-        (-10.0 + 5 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
-         -10.0 + 5 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS))
+    upper_right = geometry.Point((
+        -10.0 + 5 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+        -10.0 + 5 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+    ))
     grid = material.get_atoms_in_bounds(lower_left, upper_right)
 
     self.assertTrue((grid.atom_positions >= 0.0).all())
@@ -149,10 +161,12 @@ class GrapheneTest(absltest.TestCase):
       'simple_transition_rates',
       autospec=True,
       # About 15 events should occur per second on average.
-      return_value=np.full((3,), 5.0, dtype=np.float32))
+      return_value=np.full((3,), 5.0, dtype=np.float32),
+  )
   def test_graphene_transitions_without_affecting_structure(self, mock_rate_fn):
-    material = graphene.PristineSingleDopedGraphene(self.rng,
-                                                    predict_rates=mock_rate_fn)
+    material = graphene.PristineSingleDopedGraphene(
+        self.rng, predict_rates=mock_rate_fn
+    )
 
     atom_positions_before = np.copy(material.atom_positions)
     atomic_numbers_before = np.copy(material.atomic_numbers)
@@ -172,11 +186,14 @@ class GrapheneTest(absltest.TestCase):
       'simple_transition_rates',
       autospec=True,
       # About 15 events should occur per second on average.
-      return_value=np.full((3,), 5.0, dtype=np.float32))
+      return_value=np.full((3,), 5.0, dtype=np.float32),
+  )
   def test_simulator_allows_multiple_transitions_when_rates_are_high(
-      self, mock_rate_fn):
-    material = graphene.PristineSingleDopedGraphene(self.rng,
-                                                    predict_rates=mock_rate_fn)
+      self, mock_rate_fn
+  ):
+    material = graphene.PristineSingleDopedGraphene(
+        self.rng, predict_rates=mock_rate_fn
+    )
     material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
 
     self.assertGreater(mock_rate_fn.call_count, 1)
@@ -190,7 +207,8 @@ class GrapheneTest(absltest.TestCase):
         # About 0.3 events should occur per second on average.
         rate_fn.return_value = np.full((3,), 0.1, dtype=np.float32)
         material = graphene.PristineSingleDopedGraphene(
-            self.rng, predict_rates=rate_fn)
+            self.rng, predict_rates=rate_fn
+        )
         material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
         low_rate_transitions = rate_fn.call_count
 
@@ -199,12 +217,14 @@ class GrapheneTest(absltest.TestCase):
         # About 6 events should occur per second on average.
         rate_fn.return_value = np.full((3,), 2.0, dtype=np.float32)
         material = graphene.PristineSingleDopedGraphene(
-            self.rng, predict_rates=rate_fn)
+            self.rng, predict_rates=rate_fn
+        )
         material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
         high_rate_transitions = rate_fn.call_count
 
       high_rate_transitioned_more_than_low_rate.append(
-          high_rate_transitions > low_rate_transitions)
+          high_rate_transitions > low_rate_transitions
+      )
 
     # Check the high rate function transitions more frequently 90% of the time.
     p = sum(high_rate_transitioned_more_than_low_rate) / num_trials

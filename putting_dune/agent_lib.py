@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Agents for Putting Dune."""
 
 import abc
@@ -37,9 +38,9 @@ class Agent(abc.ABC):
     """Steps the agent.
 
     Arguments:
-      time_step: The previous TimeStep object returned by the environment.
-        From this object, the agent can infer whether this is the start
-        or end of an episode.
+      time_step: The previous TimeStep object returned by the environment. From
+        this object, the agent can infer whether this is the start or end of an
+        episode.
 
     Returns:
       An action to apply. If step was called for the last time step of
@@ -59,7 +60,8 @@ class UniformRandomAgent(Agent):
       rng: np.random.Generator,
       low: float,
       high: float,
-      size: Sequence[int]):
+      size: Sequence[int],
+  ):
     """UniformRandomAgent constructor.
 
     Args:

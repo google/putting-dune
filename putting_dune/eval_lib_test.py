@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for eval_lib."""
 
 import datetime as dt
@@ -39,12 +40,12 @@ class EvalLibTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self._mock_agent = mock.create_autospec(
-        agent_lib.Agent, spec_set=True)
+    self._mock_agent = mock.create_autospec(agent_lib.Agent, spec_set=True)
     # spec_set = False since we need to add the sim attribute after
     # creation.
     self._mock_environment = mock.create_autospec(
-        putting_dune_environment.PuttingDuneEnvironment, spec_set=False)
+        putting_dune_environment.PuttingDuneEnvironment, spec_set=False
+    )
     _add_mock_simulator_to_env(self._mock_environment)
 
   def test_eval_lib_runs_for_correct_number_of_seeds(self):
@@ -71,11 +72,13 @@ class EvalLibTest(absltest.TestCase):
     assert isinstance(action_maximum, float)
 
     agent = agent_lib.UniformRandomAgent(
-        rng, action_minimum, action_maximum, action_spec.shape)
+        rng, action_minimum, action_maximum, action_spec.shape
+    )
 
     tempdir = self.create_tempdir()
     eval_lib.evaluate(
-        agent, env, eval_lib.EvalSuite((0,)), video_save_dir=tempdir.full_path)
+        agent, env, eval_lib.EvalSuite((0,)), video_save_dir=tempdir.full_path
+    )
 
     files = os.listdir(tempdir.full_path)
     self.assertLen(files, 1)  # There should be one file saved.

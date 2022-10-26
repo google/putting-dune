@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Simulator observers."""
 
 import dataclasses
@@ -54,39 +55,42 @@ class EventObserver(simulator_utils.SimulatorObserver):
   def observe_reset(
       self,
       grid: simulator_utils.AtomicGrid,
-      fov: simulator_utils.SimulatorFieldOfView) -> None:
+      fov: simulator_utils.SimulatorFieldOfView,
+  ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.RESET,
         dt.timedelta(seconds=0),
         dt.timedelta(seconds=0),
-        {'grid': grid, 'fov': fov})
+        {'grid': grid, 'fov': fov},
+    )
     self.events = [event]
 
   def observe_transition(
-      self, time: dt.timedelta, grid: simulator_utils.AtomicGrid) -> None:
+      self, time: dt.timedelta, grid: simulator_utils.AtomicGrid
+  ) -> None:
     event = SimulatorEvent(
-        SimulatorEventType.TRANSITION,
-        time,
-        time,
-        {'grid': grid})
+        SimulatorEventType.TRANSITION, time, time, {'grid': grid}
+    )
     self.events.append(event)
 
   def observe_apply_control(
-      self,
-      start_time: dt.timedelta,
-      control: simulator_utils.SimulatorControl) -> None:
+      self, start_time: dt.timedelta, control: simulator_utils.SimulatorControl
+  ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.APPLY_CONTROL,
         start_time,
         start_time + control.dwell_time,
-        {'position': control.position})
+        {'position': control.position},
+    )
     self.events.append(event)
 
   def observe_take_image(
       self,
       start_time: dt.timedelta,
       end_time: dt.timedelta,
-      fov: simulator_utils.SimulatorFieldOfView) -> None:
+      fov: simulator_utils.SimulatorFieldOfView,
+  ) -> None:
     event = SimulatorEvent(
-        SimulatorEventType.TAKE_IMAGE, start_time, end_time, {'fov': fov})
+        SimulatorEventType.TAKE_IMAGE, start_time, end_time, {'fov': fov}
+    )
     self.events.append(event)

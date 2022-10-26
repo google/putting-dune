@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for plotting_utils."""
 
 from absl.testing import absltest
@@ -24,8 +25,9 @@ from putting_dune import run_helpers
 from putting_dune import simulator_observers
 
 
-def _generate_events_with_random_policy(
-) -> list[simulator_observers.SimulatorEvent]:
+def _generate_events_with_random_policy() -> (
+    list[simulator_observers.SimulatorEvent]
+):
   env = run_helpers.create_putting_dune_env(seed=0, step_limit=5)
   rng = np.random.default_rng(0)
 
@@ -37,7 +39,8 @@ def _generate_events_with_random_policy(
   assert isinstance(action_maximum, float)
 
   agent = agent_lib.UniformRandomAgent(
-      rng, action_minimum, action_maximum, action_spec.shape)
+      rng, action_minimum, action_maximum, action_spec.shape
+  )
 
   event_observer = simulator_observers.EventObserver()
   env.sim.add_observer(event_observer)
@@ -55,7 +58,8 @@ class EvalLibTest(absltest.TestCase):
   def test_something(self):
     events = _generate_events_with_random_policy()
     anim = plotting_utils.generate_video_from_simulator_events(
-        events, goal_position=np.asarray([0.0, 0.0]))
+        events, goal_position=np.asarray([0.0, 0.0])
+    )
 
     self.assertIsInstance(anim, animation.Animation)
 

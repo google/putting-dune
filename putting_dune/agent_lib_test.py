@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for agent."""
 
 from absl.testing import absltest
@@ -39,7 +40,8 @@ class AgentTest(parameterized.TestCase):
       dict(testcase_name='loose_bounds', low=-1.0, high=1.0),
   )
   def test_uniform_agent_selects_actions_within_bounds(
-      self, low: float, high: float):
+      self, low: float, high: float
+  ):
     agent = agent_lib.UniformRandomAgent(self._rng, low, high, (10,))
 
     action = agent.step(_ARBITRARY_STEP)
@@ -51,7 +53,8 @@ class AgentTest(parameterized.TestCase):
       dict(testcase_name='multidimensional', shape=(4, 3, 2)),
   )
   def test_uniform_agent_selects_actions_with_correct_shape(
-      self, shape: tuple[int, ...]):
+      self, shape: tuple[int, ...]
+  ):
     agent = agent_lib.UniformRandomAgent(self._rng, 0.0, 1.0, shape)
 
     action = agent.step(_ARBITRARY_STEP)

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for putting_dune_environment."""
 
 from unittest import mock
@@ -46,15 +47,17 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
   def test_environment_is_initialized_correctly(self):
     self.assertIsInstance(
-        self.env, putting_dune_environment.PuttingDuneEnvironment)
+        self.env, putting_dune_environment.PuttingDuneEnvironment
+    )
     self.assertIsInstance(self.env, dm_env.Environment)
 
   def test_environment_reset(self):
     step = self.env.reset()
 
     self.assertIsInstance(step, dm_env.TimeStep)
-    self.assertSequenceEqual(step.observation.shape,
-                             self.env.observation_spec().shape)
+    self.assertSequenceEqual(
+        step.observation.shape, self.env.observation_spec().shape
+    )
 
   def test_environment_step(self):
     env = putting_dune_environment.PuttingDuneEnvironment()
@@ -63,8 +66,9 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
     step = env.step(action)
 
     self.assertIsInstance(step, dm_env.TimeStep)
-    self.assertSequenceEqual(step.observation.shape,
-                             env.observation_spec().shape)
+    self.assertSequenceEqual(
+        step.observation.shape, env.observation_spec().shape
+    )
 
   def test_environment_render(self):
     self.env.reset()

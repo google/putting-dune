@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """A collection of action adapters for PuttingDuneEnvironment."""
 
 import abc
@@ -40,7 +41,8 @@ class ActionAdapter(abc.ABC):
   def get_action(
       self,
       grid: simulator_utils.AtomicGrid,
-      action: np.ndarray) -> list[simulator_utils.SimulatorControl]:
+      action: np.ndarray,
+  ) -> list[simulator_utils.SimulatorControl]:
     """Gets simulator controls from the agent action."""
 
   @property
@@ -66,7 +68,8 @@ class DeltaPositionActionAdapter(ActionAdapter):
   def get_action(
       self,
       grid: simulator_utils.AtomicGrid,
-      action: np.ndarray) -> list[simulator_utils.SimulatorControl]:
+      action: np.ndarray,
+  ) -> list[simulator_utils.SimulatorControl]:
     del grid  # Unused.
 
     self.beam_pos += action
@@ -74,16 +77,20 @@ class DeltaPositionActionAdapter(ActionAdapter):
     # of view. In the future, we may want to change this.
     self.beam_pos = np.clip(self.beam_pos, 0.0, 1.0)
 
-    return [simulator_utils.SimulatorControl(
-        geometry.Point(self.beam_pos[0], self.beam_pos[1]),
-        # TODO(joshgreaves): Choose/parameterize dwell time. 1.5 is arbitrary.
-        dt.timedelta(seconds=1.5))]
+    return [
+        simulator_utils.SimulatorControl(
+            geometry.Point(self.beam_pos[0], self.beam_pos[1]),
+            # TODO(joshgreaves): Choose/parameterize dwell time.
+            dt.timedelta(seconds=1.5),
+        )
+    ]
 
   @property
   def action_spec(self) -> specs.BoundedArray:
     # x, y position of the STEM probe.
     return specs.BoundedArray(
-        shape=(2,), dtype=np.float32, minimum=-0.1, maximum=0.1)
+        shape=(2,), dtype=np.float32, minimum=-0.1, maximum=0.1
+    )
 
 
 class RelativeToSiliconActionAdapter:
@@ -95,7 +102,8 @@ class RelativeToSiliconActionAdapter:
   def get_action(
       self,
       grid: simulator_utils.AtomicGrid,
-      action: np.ndarray) -> list[simulator_utils.SimulatorControl]:
+      action: np.ndarray,
+  ) -> list[simulator_utils.SimulatorControl]:
     """Gets simulator controls from the agent action."""
     silicon_position = graphene.get_silicon_positions(grid)
 
@@ -103,7 +111,8 @@ class RelativeToSiliconActionAdapter:
       raise RuntimeError(
           'Expected to find one silicon with x, y coordinates. Instead, '
           f'got {silicon_position.shape[0]} silicon atoms with '
-          f'{silicon_position.shape[1]} dimensions.')
+          f'{silicon_position.shape[1]} dimensions.'
+      )
 
     nearest_neighbors = neighbors.NearestNeighbors(
         n_neighbors=4,  # Self and 3 nearest.
@@ -115,24 +124,30 @@ class RelativeToSiliconActionAdapter:
 
     if abs(neighbor_distances[1] - neighbor_distances[3]) > 1e-3:
       bond_distance_difference = abs(
-          neighbor_distances[1] - neighbor_distances[3])
+          neighbor_distances[1] - neighbor_distances[3]
+      )
       logging.warning(
-          '%s is intended for pristine graphene. It expects the 1st and '
-          '3rd nearest neighbors to be roughly equidistant. '
-          'Difference was %.3f',
+          (
+              '%s is intended for pristine graphene. It expects the 1st and '
+              '3rd nearest neighbors to be roughly equidistant. '
+              'Difference was %.3f'
+          ),
           self.__class__.__name__,
-          bond_distance_difference)
+          bond_distance_difference,
+      )
 
     # Action is [dx, dy] in unit cell terms.
     cell_radius = np.mean(neighbor_distances[1:])
     control_position = silicon_position + (action * cell_radius)
 
-    return [simulator_utils.SimulatorControl(
-        geometry.Point(*control_position),
-        dt.timedelta(seconds=1.5)
-    )]
+    return [
+        simulator_utils.SimulatorControl(
+            geometry.Point(*control_position), dt.timedelta(seconds=1.5)
+        )
+    ]
 
   @property
   def action_spec(self) -> specs.BoundedArray:
     return specs.BoundedArray(
-        shape=(2,), dtype=np.float32, minimum=-1.0, maximum=1.0)
+        shape=(2,), dtype=np.float32, minimum=-1.0, maximum=1.0
+    )

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for data utils."""
 
 import collections
@@ -35,22 +36,25 @@ class DataUtilsTest(parameterized.TestCase):
           num_samples=100,
           num_states=3,
           context_dim=2,
-          actual_time_range=(0., 1.0),
-          mode='prior'),
+          actual_time_range=(0.0, 1.0),
+          mode='prior',
+      ),
       dict(
           testcase_name='small_scale_from_network',
           num_samples=100,
           num_states=3,
           context_dim=2,
-          actual_time_range=(0., 1.0),
-          mode='network'),
+          actual_time_range=(0.0, 1.0),
+          mode='network',
+      ),
       dict(
           testcase_name='large_scale_from_network',
           num_samples=1000,
           num_states=20,
           context_dim=64,
-          actual_time_range=(0., 1.0),
-          mode='network'),
+          actual_time_range=(0.0, 1.0),
+          mode='network',
+      ),
   )
   def test_random_data_generation(
       self,
@@ -76,8 +80,10 @@ class DataUtilsTest(parameterized.TestCase):
     self.assertEqual(test_data['next_state'].shape, (num_samples, 1))
     self.assertEqual(test_data['dt'].shape, (num_samples, 1))
 
-    self.assertTrue((train_data['dt'] < actual_time_range[1]).all() and
-                    (train_data['dt'] > actual_time_range[0]).all())
+    self.assertTrue(
+        (train_data['dt'] < actual_time_range[1]).all()
+        and (train_data['dt'] > actual_time_range[0]).all()
+    )
 
   @parameterized.named_parameters(
       dict(
@@ -85,15 +91,17 @@ class DataUtilsTest(parameterized.TestCase):
           num_samples=100,
           num_states=3,
           context_dim=2,
-          actual_time_range=(0., 1.0),
-          mode='prior'),
+          actual_time_range=(0.0, 1.0),
+          mode='prior',
+      ),
       dict(
           testcase_name='small_scale_without_reflection_from_prior',
           num_samples=100,
           num_states=6,
           context_dim=2,
-          actual_time_range=(0., 1.0),
-          mode='prior'),
+          actual_time_range=(0.0, 1.0),
+          mode='prior',
+      ),
   )
   def test_data_augmentation(
       self,
@@ -112,8 +120,9 @@ class DataUtilsTest(parameterized.TestCase):
         mode=mode,
     )
 
-    train_data = data_utils.augment_data(**train_data, reflect=num_states == 3,
-                                         num_states=num_states)
+    train_data = data_utils.augment_data(
+        **train_data, reflect=num_states == 3, num_states=num_states
+    )
 
     new_len = num_states * num_samples
     if num_states == 3:
@@ -123,28 +132,36 @@ class DataUtilsTest(parameterized.TestCase):
     self.assertEqual(train_data['dt'].shape, (new_len, 1))
 
     counts = collections.Counter(np.array(train_data['next_state'].reshape(-1)))
-    for i in range(1, num_states+1):
+    for i in range(1, num_states + 1):
       self.assertEqual(counts[i], counts[1])
 
   @parameterized.named_parameters(
       dict(
           testcase_name='aligned',
-          neighbor_positions=np.array([[1, 0],
-                                       [-0.5, np.sqrt(3)/2],
-                                       [-0.5, -np.sqrt(3)/2]]),
+          neighbor_positions=np.array(
+              [[1, 0], [-0.5, np.sqrt(3) / 2], [-0.5, -np.sqrt(3) / 2]]
+          ),
           target_order=np.array([1, 0, 2], dtype=np.int32),
           beam_pos=np.array([1, 0]),
-          target_beam_pos=np.array([-0.5, -np.sqrt(3)/2]),
-          target_angles=np.array([0, -2*np.pi/3, 2*np.pi/3,]),
-          ),
+          target_beam_pos=np.array([-0.5, -np.sqrt(3) / 2]),
+          target_angles=np.array([
+              0,
+              -2 * np.pi / 3,
+              2 * np.pi / 3,
+          ]),
+      ),
       dict(
           testcase_name='singleton',
-          neighbor_positions=np.array([[1, 0],]),
+          neighbor_positions=np.array(
+              [
+                  [1, 0],
+              ]
+          ),
           target_order=np.array([0], dtype=np.int32),
           beam_pos=np.array([1, 0]),
           target_beam_pos=np.array([1, 0]),
           target_angles=np.array([0]),
-          ),
+      ),
   )
   def test_neighborhood_standardization(
       self,
@@ -154,8 +171,11 @@ class DataUtilsTest(parameterized.TestCase):
       target_beam_pos: np.ndarray,
       target_angles: np.ndarray,
   ):
-    (rotated_beam_pos, state_order, angles
-     ) = data_utils.standardize_beam_and_neighbors(beam_pos, neighbor_positions)
+    (
+        rotated_beam_pos,
+        state_order,
+        angles,
+    ) = data_utils.standardize_beam_and_neighbors(beam_pos, neighbor_positions)
     np.testing.assert_allclose(rotated_beam_pos, target_beam_pos, rtol=1e-6)
     np.testing.assert_allclose(state_order, target_order, rtol=1e-6)
     np.testing.assert_allclose(angles, target_angles, rtol=1e-6)

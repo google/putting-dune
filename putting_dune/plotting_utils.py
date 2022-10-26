@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Useful utility functions for plotting."""
 
 import datetime as dt
@@ -35,16 +36,18 @@ def format_timedelta(delta: dt.timedelta) -> str:
   return f'{minutes:02d}:{seconds:02d}:{remainder:02d}'
 
 
-def _plot(ax: plt.Axes,
-          grid: simulator_utils.AtomicGrid,
-          goal_position: Optional[np.ndarray] = None,
-          control_position: Optional[np.ndarray] = None,
-          timedelta: Optional[dt.timedelta] = None,
-          *,
-          carbon_size: float = 6.0,
-          silicon_size: float = 8.0,
-          goal_size: float = 15.0,
-          control_size: float = 10.0) -> None:
+def _plot(
+    ax: plt.Axes,
+    grid: simulator_utils.AtomicGrid,
+    goal_position: Optional[np.ndarray] = None,
+    control_position: Optional[np.ndarray] = None,
+    timedelta: Optional[dt.timedelta] = None,
+    *,
+    carbon_size: float = 6.0,
+    silicon_size: float = 8.0,
+    goal_size: float = 15.0,
+    control_size: float = 10.0,
+) -> None:
   """Utility function for common plotting."""
   carbon_atoms = grid.atom_positions[grid.atomic_numbers == graphene.CARBON]
   silicon_atoms = grid.atom_positions[grid.atomic_numbers == graphene.SILICON]
@@ -55,11 +58,13 @@ def _plot(ax: plt.Axes,
       carbon_atoms[:, 1],
       'o',
       markersize=carbon_size,
-      alpha=0.5)
+      alpha=0.5,
+  )
 
   # Plot the silicon atoms.
   ax.plot(
-      silicon_atoms[:, 0], silicon_atoms[:, 1], 'ro', markersize=silicon_size)
+      silicon_atoms[:, 0], silicon_atoms[:, 1], 'ro', markersize=silicon_size
+  )
 
   # Plot the goal
   if goal_position is not None:
@@ -68,7 +73,8 @@ def _plot(ax: plt.Axes,
   # Plot the control position.
   if control_position is not None:
     ax.plot(
-        control_position[0], control_position[1], 'k.', markersize=control_size)
+        control_position[0], control_position[1], 'k.', markersize=control_size
+    )
 
   # Plot the current time.
   if timedelta is not None:
@@ -80,7 +86,8 @@ def plot_microscope_frame(
     grid: simulator_utils.AtomicGrid,
     goal_position: Optional[np.ndarray] = None,
     control_position: Optional[np.ndarray] = None,
-    timedelta: Optional[dt.timedelta] = None) -> None:
+    timedelta: Optional[dt.timedelta] = None,
+) -> None:
   """Plots the frame in supplied axis, with coordinates in microscope frame."""
   _plot(ax, grid, goal_position, control_position, timedelta)
 
@@ -96,7 +103,8 @@ def plot_material_frame(
     goal_position: Optional[np.ndarray] = None,
     control_position: Optional[np.ndarray] = None,
     timedelta: Optional[dt.timedelta] = None,
-    fov: Optional[simulator_utils.SimulatorFieldOfView] = None) -> None:
+    fov: Optional[simulator_utils.SimulatorFieldOfView] = None,
+) -> None:
   """Plots the frame in supplied axis, with coordinates in material frame."""
   _plot(
       ax=ax,
@@ -107,17 +115,18 @@ def plot_material_frame(
       carbon_size=1.0,
       silicon_size=2.0,
       goal_size=8.0,
-      control_size=2.0)
+      control_size=2.0,
+  )
 
   if fov is not None:
-    fov_bounds = [(fov.lower_left.x, fov.lower_left.y),
-                  (fov.upper_right.x, fov.lower_left.y),
-                  (fov.upper_right.x, fov.upper_right.y),
-                  (fov.lower_left.x, fov.upper_right.y),
-                  (fov.lower_left.x, fov.lower_left.y)]
-    ax.plot([x for x, _ in fov_bounds],
-            [y for _, y in fov_bounds],
-            color='red')
+    fov_bounds = [
+        (fov.lower_left.x, fov.lower_left.y),
+        (fov.upper_right.x, fov.lower_left.y),
+        (fov.upper_right.x, fov.upper_right.y),
+        (fov.lower_left.x, fov.upper_right.y),
+        (fov.lower_left.x, fov.lower_left.y),
+    ]
+    ax.plot([x for x, _ in fov_bounds], [y for _, y in fov_bounds], color='red')
 
   ax.set_xticks([])
   ax.set_yticks([])
@@ -166,10 +175,11 @@ def generate_video_from_simulator_events(
     # to convert them to the microscope frame.
     material_frame_data = simulator_utils.AtomicGrid(
         atom_positions=np.stack([goal_position, args['control_position']]),
-        atomic_numbers=np.asarray(())  # Unused.
+        atomic_numbers=np.asarray(()),  # Unused.
     )
     microscope_frame_data = args['fov'].material_grid_to_microscope_grid(
-        material_frame_data)
+        material_frame_data
+    )
     plot_microscope_frame(
         ax=ax2,
         grid=microscope_grid,
@@ -192,7 +202,7 @@ def generate_video_from_simulator_events(
           'fov': fov,
           'control_position': control_position,
           'timedelta': event.start_time,
-          })
+      })
     if event.event_type == _SimulatorEventType.TRANSITION:
       grid = event.event_data['grid']
     if event.event_type == _SimulatorEventType.TAKE_IMAGE:

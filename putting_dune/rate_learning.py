@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Code implementing basic KMC contextual rate learning in Haiku.
-
-
-"""
+# pyformat: mode=pyink
+"""Code implementing basic KMC contextual rate learning in Haiku."""
 
 from collections.abc import Callable, Mapping, Sequence
 import functools
@@ -35,9 +33,7 @@ Params = Mapping[str, Any]
 class MLP(hk.Module):
   """A simple convenience class representing a multilayer perceptron."""
 
-  def __init__(self,
-               hidden_dimensions: Sequence[int],
-               nonlinearity=jax.nn.elu):
+  def __init__(self, hidden_dimensions: Sequence[int], nonlinearity=jax.nn.elu):
     super(MLP, self).__init__()
     self.hidden_dimensions = hidden_dimensions
     self.nonlinearity = nonlinearity
@@ -50,8 +46,9 @@ class MLP(hk.Module):
     return hk.Linear(self.hidden_dimensions[-1])(x)
 
 
-def get_mlp_fn(hidden_dimensions: Sequence[int] = (64, 64),
-               num_states: int = 3):
+def get_mlp_fn(
+    hidden_dimensions: Sequence[int] = (64, 64), num_states: int = 3
+):
   """Creates an MLP usable for rate learning."""
 
   def call_mlp(x):
@@ -62,13 +59,15 @@ def get_mlp_fn(hidden_dimensions: Sequence[int] = (64, 64),
   return hk.transform(call_mlp)
 
 
-def batched_loss_fn(params: Params,
-                    apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray],
-                                       jnp.ndarray],
-                    next_state: jnp.ndarray,
-                    elapsed_time: jnp.ndarray, did_transition: jnp.ndarray,
-                    context: jnp.ndarray,
-                    key: jnp.ndarray):
+def batched_loss_fn(
+    params: Params,
+    apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    next_state: jnp.ndarray,
+    elapsed_time: jnp.ndarray,
+    did_transition: jnp.ndarray,
+    context: jnp.ndarray,
+    key: jnp.ndarray,
+):
   """Calculates the loss on a minibatch of transitions and return metrics.
 
   Args:
@@ -83,8 +82,8 @@ def batched_loss_fn(params: Params,
   Returns:
     Mean loss, tuple of (predicted rates, rate loss, classification loss).
   """
-  def loss_fn(params, next_state, elapsed_time, did_transition, context, key):
 
+  def loss_fn(params, next_state, elapsed_time, did_transition, context, key):
     predicted_rates = apply_fn(params, key, context)
     total_rate = predicted_rates[-1]
     predicted_log_rates = predicted_rates[:-1]
@@ -93,31 +92,39 @@ def batched_loss_fn(params: Params,
     total_rate_loss = -jax.lax.cond(
         did_transition.sum(),
         lambda: (jnp.log(1.0 - jnp.exp(-total_rate * elapsed_time))),
-        lambda: (-total_rate * elapsed_time))
-    next_state_loss = (-jnp.log(predicted_probabilities[next_state - 1]) *
-                       did_transition.sum(()))
+        lambda: (-total_rate * elapsed_time),
+    )
+    next_state_loss = -jnp.log(
+        predicted_probabilities[next_state - 1]
+    ) * did_transition.sum(())
 
-    return (jnp.sum(next_state_loss) + total_rate_loss,
-            predicted_probabilities * total_rate, total_rate_loss,
-            next_state_loss)
+    return (
+        jnp.sum(next_state_loss) + total_rate_loss,
+        predicted_probabilities * total_rate,
+        total_rate_loss,
+        next_state_loss,
+    )
 
   batch_loss = jax.vmap(loss_fn, in_axes=(None, 0, 0, 0, 0, None))
-  (loss, predicted_rates, total_rate_loss,
-   next_state_loss) = batch_loss(params, next_state, elapsed_time,
-                                 did_transition, context, key)
-  return jnp.mean(loss), (predicted_rates, jnp.mean(total_rate_loss),
-                          jnp.mean(next_state_loss))
+  (loss, predicted_rates, total_rate_loss, next_state_loss) = batch_loss(
+      params, next_state, elapsed_time, did_transition, context, key
+  )
+  return jnp.mean(loss), (
+      predicted_rates,
+      jnp.mean(total_rate_loss),
+      jnp.mean(next_state_loss),
+  )
 
 
-def train_epoch(params: Params,
-                opt_state: Mapping[str, jnp.ndarray],
-                optim: optax.GradientTransformation,
-                apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray],
-                                   jnp.ndarray],
-                batch_size: int,
-                key: jnp.ndarray,
-                train_data: Mapping[str, jnp.ndarray],
-                ):
+def train_epoch(
+    params: Params,
+    opt_state: Mapping[str, jnp.ndarray],
+    optim: optax.GradientTransformation,
+    apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    batch_size: int,
+    key: jnp.ndarray,
+    train_data: Mapping[str, jnp.ndarray],
+):
   """Does one epoch of training, shuffling the dataset to create batches.
 
   Args:
@@ -137,8 +144,7 @@ def train_epoch(params: Params,
   indices = jax.random.shuffle(data_key, jnp.arange(data_size))
   batch_inds = [
       jax.lax.dynamic_slice_in_dim(indices, index * batch_size, batch_size)
-      for index in jnp.arange(0,
-                              len(indices) // batch_size)
+      for index in jnp.arange(0, len(indices) // batch_size)
   ]
   batch_inds = jnp.stack(batch_inds)
   batches = {k: array[batch_inds] for k, array in train_data.items()}
@@ -161,17 +167,17 @@ def train_epoch(params: Params,
     params = optax.apply_updates(params, updates)
     return (params, opt_state), None
 
-  (params, opt_state), _ = jax.lax.scan(train_step,
-                                        (params, opt_state),
-                                        batches)
+  (params, opt_state), _ = jax.lax.scan(
+      train_step, (params, opt_state), batches
+  )
 
   return params, opt_state, key
 
 
 @functools.partial(
     jax.jit,
-    static_argnames=('batch_size', 'optim', 'epochs',
-                     'apply_fn', 'init_fn'))
+    static_argnames=('batch_size', 'optim', 'epochs', 'apply_fn', 'init_fn'),
+)
 def train_model(
     train_data: Mapping[str, jnp.ndarray],
     test_data: Mapping[str, jnp.ndarray],
@@ -180,7 +186,8 @@ def train_model(
     key: jnp.ndarray,
     optim: optax.GradientTransformation,
     batch_size: int = 32,
-    epochs: int = 10,):
+    epochs: int = 10,
+):
   """Trains a rate prediction model from scratch.
 
   Args:
@@ -204,53 +211,78 @@ def train_model(
 
   def do_epoch(state, key):
     params, opt_state, train_data, test_data = state
-    params, opt_state, key = train_epoch(params, opt_state, optim, apply_fn,
-                                         batch_size, key, train_data)
+    params, opt_state, key = train_epoch(
+        params, opt_state, optim, apply_fn, batch_size, key, train_data
+    )
 
-    test_loss, (_, test_rate_loss, test_class_loss
-                ) = batched_loss_fn(
-                    params,
-                    apply_fn,
-                    test_data['next_state'],
-                    test_data['dt'],
-                    (test_data['next_state'] != 0),
-                    test_data['context'],
-                    key,
-                )
-    train_loss, (_, train_rate_loss, train_class_loss
-                 ) = batched_loss_fn(
-                     params,
-                     apply_fn,
-                     train_data['next_state'],
-                     train_data['dt'],
-                     (train_data['next_state'] != 0),
-                     train_data['context'],
-                     key,
-                 )
+    test_loss, (_, test_rate_loss, test_class_loss) = batched_loss_fn(
+        params,
+        apply_fn,
+        test_data['next_state'],
+        test_data['dt'],
+        (test_data['next_state'] != 0),
+        test_data['context'],
+        key,
+    )
+    train_loss, (_, train_rate_loss, train_class_loss) = batched_loss_fn(
+        params,
+        apply_fn,
+        train_data['next_state'],
+        train_data['dt'],
+        (train_data['next_state'] != 0),
+        train_data['context'],
+        key,
+    )
 
-    return ((params, opt_state, train_data, test_data),
-            (train_loss, test_loss, train_rate_loss, test_rate_loss,
-             train_class_loss, test_class_loss))
+    return (
+        (params, opt_state, train_data, test_data),
+        (
+            train_loss,
+            test_loss,
+            train_rate_loss,
+            test_rate_loss,
+            train_class_loss,
+            test_class_loss,
+        ),
+    )
 
-  ((params, opt_state, _, _),
-   (train_loss, test_loss, train_rate_loss, test_rate_loss, train_class_loss,
-    test_class_loss)) = jax.lax.scan(do_epoch,
-                                     (params, opt_state, train_data, test_data),
-                                     jax.random.split(key, num=epochs))
+  (
+      (params, opt_state, _, _),
+      (
+          train_loss,
+          test_loss,
+          train_rate_loss,
+          test_rate_loss,
+          train_class_loss,
+          test_class_loss,
+      ),
+  ) = jax.lax.scan(
+      do_epoch,
+      (params, opt_state, train_data, test_data),
+      jax.random.split(key, num=epochs),
+  )
 
-  return (params,
-          (train_loss, test_loss,
-           train_rate_loss, test_rate_loss,
-           train_class_loss, test_class_loss
-          ))
+  return (
+      params,
+      (
+          train_loss,
+          test_loss,
+          train_rate_loss,
+          test_rate_loss,
+          train_class_loss,
+          test_class_loss,
+      ),
+  )
 
 
-def bootstrap_train_models(train_data: Mapping[str, jnp.ndarray],
-                           key: jnp.ndarray,
-                           num_models: int,
-                           hidden_dimensions: Sequence[int],
-                           num_states: int,
-                           *args):
+def bootstrap_train_models(
+    train_data: Mapping[str, jnp.ndarray],
+    key: jnp.ndarray,
+    num_models: int,
+    hidden_dimensions: Sequence[int],
+    num_states: int,
+    *args,
+):
   """Trains a set of models on a single dataset by bootstrapping.
 
   Args:
@@ -277,17 +309,16 @@ def bootstrap_train_models(train_data: Mapping[str, jnp.ndarray],
   test_datasets = [[a[:test_set_len] for a in d] for d in test_datasets]
 
   train_datasets = {
-      k: jnp.stack([d[k] for d in train_datasets])
-      for k in train_data.keys()
+      k: jnp.stack([d[k] for d in train_datasets]) for k in train_data.keys()
   }
   train_datasets = {
-      k: jnp.stack([d[k] for d in test_datasets])
-      for k in train_data.keys()
+      k: jnp.stack([d[k] for d in test_datasets]) for k in train_data.keys()
   }
   init_fn, apply_fn = get_mlp_fn(hidden_dimensions, num_states)
   batch_train = jax.vmap(train_model, in_axes=(0, 0, 0, None, None, None))
-  return batch_train(train_datasets, test_datasets,
-                     apply_fn, init_fn, train_keys, *args)
+  return batch_train(
+      train_datasets, test_datasets, apply_fn, init_fn, train_keys, *args
+  )
 
 
 def main(argv: Sequence[str]) -> None:

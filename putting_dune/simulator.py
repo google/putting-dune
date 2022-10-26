@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Putting Dune simulator."""
 
 import datetime as dt
@@ -33,7 +34,8 @@ class PuttingDuneSimulator:
       # assumes there is one silicon atom to follow.
       material: graphene.PristineSingleDopedGraphene,
       *,
-      observers: Sequence[simulator_utils.SimulatorObserver] = ()):
+      observers: Sequence[simulator_utils.SimulatorObserver] = (),
+  ):
     """PuttingDuneSimulator Constructor.
 
     Note that the simulator itself is deterministic, but the objects
@@ -43,8 +45,8 @@ class PuttingDuneSimulator:
 
     Args:
       material: The material to simulator.
-      observers: A sequence of objects that observe the inner workings of
-        the simulator.
+      observers: A sequence of objects that observe the inner workings of the
+        simulator.
     """
     self.material = material
     self._observers = list(observers)
@@ -58,7 +60,8 @@ class PuttingDuneSimulator:
     silicon_position = self.material.get_silicon_position()
     self._fov = simulator_utils.SimulatorFieldOfView(
         geometry.Point(silicon_position - 10),
-        geometry.Point(silicon_position + 10))
+        geometry.Point(silicon_position + 10),
+    )
 
   def reset(self) -> simulator_utils.SimulatorObservation:
     """Reset to a plausible simulator state."""
@@ -69,7 +72,8 @@ class PuttingDuneSimulator:
     silicon_position = self.material.get_silicon_position()
     self._fov = simulator_utils.SimulatorFieldOfView(
         geometry.Point(silicon_position - 10),
-        geometry.Point(silicon_position + 10))
+        geometry.Point(silicon_position + 10),
+    )
 
     self.elapsed_time = dt.timedelta(seconds=0)
     for observer in self._observers:
@@ -78,9 +82,8 @@ class PuttingDuneSimulator:
     observed_grid = self._image_material()
 
     return simulator_utils.SimulatorObservation(
-        observed_grid,
-        None,
-        self.elapsed_time)
+        observed_grid, None, self.elapsed_time
+    )
 
   def step_and_image(
       self,
@@ -92,9 +95,8 @@ class PuttingDuneSimulator:
     of actions and then generate an image.
 
     Arguments:
-      controls: An iterable of controls to apply. This expects an iterable
-        since we may want to accept a sequence of controls between
-        generating images.
+      controls: An iterable of controls to apply. This expects an iterable since
+        we may want to accept a sequence of controls between generating images.
 
     Returns:
       An observation from the simulator.
@@ -104,7 +106,8 @@ class PuttingDuneSimulator:
       # TODO(joshgreaves): Control clipping to [0, 1]?
       control_position = self.convert_point_to_material_frame(control.position)
       control = simulator_utils.SimulatorControl(
-          control_position, control.dwell_time)
+          control_position, control.dwell_time
+      )
 
       for observer in self._observers:
         observer.observe_apply_control(self.elapsed_time, control)
@@ -131,7 +134,8 @@ class PuttingDuneSimulator:
       silicon_position = self.material.get_silicon_position()
       self._fov = simulator_utils.SimulatorFieldOfView(
           geometry.Point(silicon_position - 10),
-          geometry.Point(silicon_position + 10))
+          geometry.Point(silicon_position + 10),
+      )
       observed_grid = self._image_material()
 
     return simulator_utils.SimulatorObservation(
@@ -144,7 +148,8 @@ class PuttingDuneSimulator:
     self._observers.append(observer)
 
   def remove_observer(
-      self, observer: simulator_utils.SimulatorObserver) -> None:
+      self, observer: simulator_utils.SimulatorObserver
+  ) -> None:
     self._observers.remove(observer)
 
   def convert_point_to_material_frame(
@@ -155,8 +160,8 @@ class PuttingDuneSimulator:
     # We make a fake atomic grid with just the control to benefit from
     # the code that transforms grids.
     grid = simulator_utils.AtomicGrid(
-        np.asarray(point).reshape(1, 2),
-        np.zeros(1))
+        np.asarray(point).reshape(1, 2), np.zeros(1)
+    )
     grid = self._fov.microscope_grid_to_material_grid(grid)
     return geometry.Point(grid.atom_positions.reshape(-1))
 
@@ -168,8 +173,8 @@ class PuttingDuneSimulator:
     # We make a fake atomic grid with just the control to benefit from
     # the code that transforms grids.
     grid = simulator_utils.AtomicGrid(
-        np.asarray(point).reshape(1, 2),
-        np.zeros(1))
+        np.asarray(point).reshape(1, 2), np.zeros(1)
+    )
     grid = self._fov.material_grid_to_microscope_grid(grid)
     return geometry.Point(grid.atom_positions.reshape(-1))
 
@@ -180,13 +185,15 @@ class PuttingDuneSimulator:
     # we should account for it here.
 
     observation = self.material.get_atoms_in_bounds(
-        self._fov.lower_left, self._fov.upper_right)
+        self._fov.lower_left, self._fov.upper_right
+    )
 
     for observer in self._observers:
       observer.observe_take_image(
           start_time=self.elapsed_time,
           end_time=self.elapsed_time + self._image_duration,
-          fov=self._fov)
+          fov=self._fov,
+      )
 
     self.elapsed_time += self._image_duration
 

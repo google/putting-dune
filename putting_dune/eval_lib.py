@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Functions for evaluating an agent."""
 
 import dataclasses
@@ -45,16 +46,17 @@ def evaluate(
     env: putting_dune_environment.PuttingDuneEnvironment,
     eval_suite: EvalSuite,
     *,
-    video_save_dir: Optional[str] = None) -> list[EvalResult]:
+    video_save_dir: Optional[str] = None,
+) -> list[EvalResult]:
   """Evaluates an agent on the specified environment and evaluation suite.
 
   Args:
     agent: The agent to evluate.
     env: The PuttingDuneEnvironment to evaluate on.
     eval_suite: The evaluation suite to run.
-    video_save_dir: A directory to save videos of the evaluation runs at.
-      If set to None, then videos won't be generated. Generating videos
-      significantly slows down evaluation time.
+    video_save_dir: A directory to save videos of the evaluation runs at. If set
+      to None, then videos won't be generated. Generating videos significantly
+      slows down evaluation time.
 
   Returns:
     A list containing eval results, one for each seed in the eval_suite.
@@ -85,8 +87,10 @@ def evaluate(
       num_actions_taken += 1
       total_reward += time_step.reward
 
-    reached_goal = (time_step.step_type == dm_env.StepType.LAST
-                    and time_step.discount == 0.0)
+    reached_goal = (
+        time_step.step_type == dm_env.StepType.LAST
+        and time_step.discount == 0.0
+    )
 
     seconds_to_goal = env.sim.elapsed_time.total_seconds()
     if not reached_goal:
@@ -97,13 +101,14 @@ def evaluate(
         reached_goal=reached_goal,
         num_actions_taken=num_actions_taken,
         seconds_to_goal=seconds_to_goal,
-        total_reward=total_reward)
+        total_reward=total_reward,
+    )
     results.append(eval_result)
 
     if video_save_dir is not None:
       anim = plotting_utils.generate_video_from_simulator_events(
-          observers['event_observer'].events,
-          env._goal_pos_material_frame)  # pylint: disable=protected-access
+          observers['event_observer'].events, env._goal_pos_material_frame  # pylint: disable=protected-access
+      )
       anim.save(os.path.join(video_save_dir, f'{seed}.gif'))
 
   for observer in observers.values():

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Shared helpers for RL experiments."""
 
 from typing import Sequence, cast

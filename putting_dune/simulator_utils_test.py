@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for simulator_utils."""
 
 from absl.testing import absltest
@@ -26,7 +27,8 @@ class SimulatorUtilsTest(absltest.TestCase):
   def test_field_of_view_correctly_calculates_offset(self):
     fov = simulator_utils.SimulatorFieldOfView(
         lower_left=geometry.Point((0.0, 1.0)),
-        upper_right=geometry.Point((1.0, 3.0)))
+        upper_right=geometry.Point((1.0, 3.0)),
+    )
 
     offset = np.asarray(fov.offset)
     np.testing.assert_allclose(offset, np.asarray([0.5, 2.0]))
@@ -34,7 +36,8 @@ class SimulatorUtilsTest(absltest.TestCase):
   def test_fov_to_string_formats_string_as_expected(self):
     fov = simulator_utils.SimulatorFieldOfView(
         lower_left=geometry.Point((0.128, -5.699)),
-        upper_right=geometry.Point((1.234, 8.0)))
+        upper_right=geometry.Point((1.234, 8.0)),
+    )
 
     fov_str = str(fov)
 

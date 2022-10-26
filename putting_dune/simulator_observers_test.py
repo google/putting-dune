@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for simulator_observers."""
 
 import datetime as dt
@@ -30,48 +31,49 @@ class SimulatorObserversTest(absltest.TestCase):
 
     grid = simulator_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
     fov = simulator_utils.SimulatorFieldOfView(
-        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0)))
+        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
+    )
     observer.observe_reset(grid, fov)
     observer.observe_apply_control(
         dt.timedelta(seconds=1.0),
         simulator_utils.SimulatorControl(
-            geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)))
-    observer.observe_transition(
-        dt.timedelta(seconds=2.0), grid)
-    observer.observe_transition(
-        dt.timedelta(seconds=3.0), grid)
+            geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)
+        ),
+    )
+    observer.observe_transition(dt.timedelta(seconds=2.0), grid)
+    observer.observe_transition(dt.timedelta(seconds=3.0), grid)
     observer.observe_take_image(
-        dt.timedelta(seconds=4.0),
-        dt.timedelta(seconds=4.0),
-        fov)
+        dt.timedelta(seconds=4.0), dt.timedelta(seconds=4.0), fov
+    )
 
     events = observer.events
     self.assertLen(events, 5)
     self.assertEqual(
-        events[0].event_type,
-        simulator_observers.SimulatorEventType.RESET)
+        events[0].event_type, simulator_observers.SimulatorEventType.RESET
+    )
     self.assertEqual(
         events[1].event_type,
-        simulator_observers.SimulatorEventType.APPLY_CONTROL)
+        simulator_observers.SimulatorEventType.APPLY_CONTROL,
+    )
     self.assertEqual(
-        events[2].event_type,
-        simulator_observers.SimulatorEventType.TRANSITION)
+        events[2].event_type, simulator_observers.SimulatorEventType.TRANSITION
+    )
     self.assertEqual(
-        events[3].event_type,
-        simulator_observers.SimulatorEventType.TRANSITION)
+        events[3].event_type, simulator_observers.SimulatorEventType.TRANSITION
+    )
     self.assertEqual(
-        events[4].event_type,
-        simulator_observers.SimulatorEventType.TAKE_IMAGE)
+        events[4].event_type, simulator_observers.SimulatorEventType.TAKE_IMAGE
+    )
 
   def test_event_observer_reset_resets_events(self):
     observer = simulator_observers.EventObserver()
     grid = simulator_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
     fov = simulator_utils.SimulatorFieldOfView(
-        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0)))
+        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
+    )
 
     observer.observe_reset(grid, fov)
-    observer.observe_transition(
-        dt.timedelta(seconds=1.0), grid)
+    observer.observe_transition(dt.timedelta(seconds=1.0), grid)
 
     self.assertLen(observer.events, 2)
 

@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Code implementing basic KMC contextual rate learning in Haiku.
-
-
-"""
+# pyformat: mode=pyink
+"""Code implementing basic KMC contextual rate learning in Haiku."""
 
 import enum
 import functools
@@ -58,8 +56,9 @@ def get_all_context_rotations(context: jnp.ndarray, num_states: int = 3):
 
 def rotate_coordinates(coord: jnp.ndarray, theta: float):
   """Rotates a set of coordinates by theta radians."""
-  rotation_matrix = jnp.array([[jnp.cos(theta), -jnp.sin(theta)],
-                               [jnp.sin(theta), jnp.cos(theta)]])
+  rotation_matrix = jnp.array(
+      [[jnp.cos(theta), -jnp.sin(theta)], [jnp.sin(theta), jnp.cos(theta)]]
+  )
   return rotation_matrix @ coord
 
 
@@ -70,10 +69,7 @@ def rotate_attributes(x: jnp.ndarray, n: int):
 
 def get_all_rate_rotations(rates: jnp.ndarray, num_states: int = 3):
   """Gets all possible rate rotations."""
-  rot_rates = [
-      rotate_attributes(rates, n)
-      for n in range(num_states)
-  ]
+  rot_rates = [rotate_attributes(rates, n) for n in range(num_states)]
   return jnp.stack(rot_rates, 0)
 
 
@@ -84,17 +80,22 @@ def rotate_index(ind: jnp.ndarray, n: int, num_states: int = 3):
 
 def get_all_state_rotations(states: jnp.ndarray, num_states: int = 3):
   """Get all possible state rotations."""
-  return jnp.stack([
-      rotate_index(states, n, num_states=num_states)
-      for n in jnp.arange(num_states)
-  ], 0)
+  return jnp.stack(
+      [
+          rotate_index(states, n, num_states=num_states)
+          for n in jnp.arange(num_states)
+      ],
+      0,
+  )
 
 
-def reflect_transition(states: jnp.ndarray,
-                       times: jnp.ndarray,
-                       rates: jnp.ndarray,
-                       context: jnp.ndarray,
-                       num_states: int = 3):
+def reflect_transition(
+    states: jnp.ndarray,
+    times: jnp.ndarray,
+    rates: jnp.ndarray,
+    context: jnp.ndarray,
+    num_states: int = 3,
+):
   """Reflects a transition along the y=0 axis."""
   if num_states != 3:
     raise NotImplementedError('Reflection currently only supported for n=3.')
@@ -113,11 +114,13 @@ def reflect_transition(states: jnp.ndarray,
 reflect_dataset = jax.vmap(reflect_transition)
 
 
-def get_transition_rotations(states: jnp.ndarray,
-                             times: jnp.ndarray,
-                             rates: jnp.ndarray,
-                             contexts: jnp.ndarray,
-                             num_states: int = 3):
+def get_transition_rotations(
+    states: jnp.ndarray,
+    times: jnp.ndarray,
+    rates: jnp.ndarray,
+    contexts: jnp.ndarray,
+    num_states: int = 3,
+):
   """Gets all valid rotations of an entire transition."""
   rot_states = get_all_state_rotations(states - 1, num_states=num_states)
   rot_states = (rot_states + 1) * jnp.sign(states[None])
@@ -128,28 +131,35 @@ def get_transition_rotations(states: jnp.ndarray,
   return rot_states, times, rot_rates, rot_context
 
 
-def rotate_dataset(states: jnp.ndarray,
-                   times: jnp.ndarray,
-                   rates: jnp.ndarray,
-                   contexts: jnp.ndarray,
-                   num_states: int = 3):
+def rotate_dataset(
+    states: jnp.ndarray,
+    times: jnp.ndarray,
+    rates: jnp.ndarray,
+    contexts: jnp.ndarray,
+    num_states: int = 3,
+):
   """Get all valid rotations of an entire dataset."""
   rotate = functools.partial(get_transition_rotations, num_states=num_states)
   map_rotate = jax.vmap(rotate, in_axes=(0, 0, 0, 0))
 
   rot_states, rot_times, rot_rates, rot_contexts = map_rotate(
-      states, times, rates, contexts)
+      states, times, rates, contexts
+  )
 
-  return (rot_states.reshape(-1, *states.shape[1:]),
-          rot_times.reshape(-1, *times.shape[1:]),
-          rot_rates.reshape(-1, *rates.shape[1:]),
-          rot_contexts.reshape(-1, *contexts.shape[1:]))
+  return (
+      rot_states.reshape(-1, *states.shape[1:]),
+      rot_times.reshape(-1, *times.shape[1:]),
+      rot_rates.reshape(-1, *rates.shape[1:]),
+      rot_contexts.reshape(-1, *contexts.shape[1:]),
+  )
 
 
-def prior_rates(context: jnp.ndarray,
-                mean: jnp.ndarray,
-                cov: jnp.ndarray,
-                max_rate: float,):
+def prior_rates(
+    context: jnp.ndarray,
+    mean: jnp.ndarray,
+    cov: jnp.ndarray,
+    max_rate: float,
+):
   """Gets transition rates as following a Gaussian curve with given maximum."""
   norm = max_rate / jax.scipy.stats.multivariate_normal.pdf(mean, mean, cov)
   rate = jax.scipy.stats.multivariate_normal.pdf(context, mean, cov)
@@ -172,9 +182,9 @@ def generate_synthetic_data(
     num_states: How many states to transition between.
     context_dim: Dimensionality of the random context vectors.
     actual_time_range: How long of windows to sample. Controls frequency of
-        empty transitions.
+      empty transitions.
     mode: Whether to use a random network ("network") or an informed prior
-        ("prior") to generate data.
+      ("prior") to generate data.
 
   Returns:
     train_data: Training dataset
@@ -189,15 +199,17 @@ def generate_synthetic_data(
     (init_mlp, apply_mlp) = rate_learning.get_mlp_fn((64,), num_states)
     init_params = init_mlp(x=jnp.zeros(context_dim), rng=init_key)
 
-  @functools.partial(jax.jit, static_argnames=('shape'))
+  @functools.partial(jax.jit, static_argnames='shape')
   def sample_exp(sample_key, k, shape):
-    return -jnp.log(jax.random.uniform(sample_key, shape,
-                                       dtype=jnp.float32)) / k
+    return (
+        -jnp.log(jax.random.uniform(sample_key, shape, dtype=jnp.float32)) / k
+    )
 
   @jax.jit
   def sample_network_rates(element_key):
     state_key, time_key, actual_time_key, context_key = jax.random.split(
-        element_key, 4)
+        element_key, 4
+    )
     context = jax.random.normal(context_key, shape=(1, context_dim))
     rates = apply_mlp(init_params, context_key, context)[0, :-1]
 
@@ -206,52 +218,66 @@ def generate_synthetic_data(
     next_state = jax.random.choice(state_key, len(rates), (1,), p=p)
     next_time = sample_exp(time_key, total_rate, (1,))
     actual_time = jax.random.uniform(
-        actual_time_key, (1,),
+        actual_time_key,
+        (1,),
         minval=actual_time_range[0],
-        maxval=actual_time_range[1])
+        maxval=actual_time_range[1],
+    )
 
     transitioned = next_time < actual_time
     next_state = transitioned * (next_state + 1)
 
-    return {'next_state': next_state,
-            'dt': actual_time,
-            'rates': rates,
-            'context': context[0]}
+    return {
+        'next_state': next_state,
+        'dt': actual_time,
+        'rates': rates,
+        'context': context[0],
+    }
 
   @jax.jit
   def sample_from_prior(key):
-    (state_key, rot_key, time_key, actual_time_key, context_key
-        ) = jax.random.split(key, 5)
-    context = sample_multivariate_context(context_key,
-                                          graphene.PRIOR_RATE_MEAN,
-                                          graphene.PRIOR_RATE_COV*1.5)
+    (
+        state_key,
+        rot_key,
+        time_key,
+        actual_time_key,
+        context_key,
+    ) = jax.random.split(key, 5)
+    context = sample_multivariate_context(
+        context_key, graphene.PRIOR_RATE_MEAN, graphene.PRIOR_RATE_COV * 1.5
+    )
     rates = prior_rates(
         get_all_context_rotations(context, num_states=num_states),
         mean=graphene.PRIOR_RATE_MEAN,
         cov=graphene.PRIOR_RATE_COV,
-        max_rate=graphene.PRIOR_MAX_RATE)
+        max_rate=graphene.PRIOR_MAX_RATE,
+    )
     total_rate = jnp.sum(rates, -1)
     p = rates / total_rate
     next_state = jax.random.choice(state_key, len(rates), (), p=p)
 
     rotation_factor = jax.random.randint(rot_key, (), 0, num_states)
     context = rotate_coordinates(
-        context, 2 * rotation_factor * jnp.pi / num_states)
+        context, 2 * rotation_factor * jnp.pi / num_states
+    )
     next_state = rotate_index(
-        next_state, rotation_factor, num_states=num_states)
+        next_state, rotation_factor, num_states=num_states
+    )
     rates = rotate_attributes(rates, rotation_factor)
     next_time = sample_exp(time_key, total_rate, (1,))
     actual_time = jax.random.uniform(
-        actual_time_key, (1,),
+        actual_time_key,
+        (1,),
         minval=actual_time_range[0],
-        maxval=actual_time_range[1])
+        maxval=actual_time_range[1],
+    )
     transitioned = next_time < actual_time
     next_state = transitioned * (next_state + 1)
     return {
         'next_state': next_state,
         'dt': actual_time,
         'rates': rates,
-        'context': context
+        'context': context,
     }
 
   vmap_sample_from_prior = jax.vmap(sample_from_prior, axis_name='batch')
@@ -273,8 +299,7 @@ def generate_synthetic_data(
   return train_data, test_data
 
 
-def bootstrap_dataset(data: Mapping[str, np.ndarray],
-                      rng: jnp.ndarray):
+def bootstrap_dataset(data: Mapping[str, np.ndarray], rng: jnp.ndarray):
   """Bootstraps a dataset to generate a training and testing dataset.
 
   Args:
@@ -287,10 +312,8 @@ def bootstrap_dataset(data: Mapping[str, np.ndarray],
   """
   original_length = list(data.values())[0].shape[0]
   indices = jax.random.choice(
-      rng,
-      a=original_length,
-      shape=[original_length],
-      replace=True)
+      rng, a=original_length, shape=[original_length], replace=True
+  )
   train_data = {k: a[indices] for k, a in data.items()}
   test_indices = set(range(original_length)) - set(np.array(indices))
   test_indices = np.array(list(test_indices))
@@ -298,29 +321,33 @@ def bootstrap_dataset(data: Mapping[str, np.ndarray],
   return train_data, test_data
 
 
-def augment_data(next_state: jnp.ndarray,
-                 dt: jnp.ndarray,
-                 rates: jnp.ndarray,
-                 context: jnp.ndarray,
-                 reflect: bool = True,
-                 num_states: int = 3):
+def augment_data(
+    next_state: jnp.ndarray,
+    dt: jnp.ndarray,
+    rates: jnp.ndarray,
+    context: jnp.ndarray,
+    reflect: bool = True,
+    num_states: int = 3,
+):
   """Augments a dataset by adding all valid reflections and rotations."""
   if reflect:
     ref_next_state, ref_dt, ref_rates, ref_context = reflect_dataset(
-        next_state, dt, rates, context)
+        next_state, dt, rates, context
+    )
     next_state = jnp.concatenate([next_state, ref_next_state])
     dt = jnp.concatenate([dt, ref_dt])
     rates = jnp.concatenate([rates, ref_rates])
     context = jnp.concatenate([context, ref_context])
 
   next_state, dt, rates, context = rotate_dataset(
-      next_state, dt, rates, context, num_states=num_states)
+      next_state, dt, rates, context, num_states=num_states
+  )
 
   return {
       'next_state': next_state,
       'dt': dt,
       'rates': rates,
-      'context': context
+      'context': context,
   }
 
 
@@ -331,9 +358,8 @@ def get_neighbor_angles(neighbor_positions: np.ndarray) -> np.ndarray:
 
 
 def standardize_beam_and_neighbors(
-    beam_pos: np.ndarray,
-    neighbor_positions: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    beam_pos: np.ndarray, neighbor_positions: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
   """Standardizes local graphene rotation, adjusts beam and sorts neighbors."""
   angles = get_neighbor_angles(neighbor_positions)
   angle = np.min(angles)

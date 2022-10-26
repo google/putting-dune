@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Tests for rate learning."""
 
 import time
@@ -38,24 +39,26 @@ class RateLearningTest(parameterized.TestCase):
           num_samples=100,
           num_states=3,
           context_dim=2,
-          actual_time_range=(0., 5.0),
+          actual_time_range=(0.0, 5.0),
           mode='prior',
           mlp_dims=(
               16,
               16,
-          )),
+          ),
+      ),
       dict(
           testcase_name='small_scale_from_network',
           num_samples=100,
           num_states=3,
           context_dim=2,
-          actual_time_range=(0., 5.0),
+          actual_time_range=(0.0, 5.0),
           mode='network',
           mlp_dims=(
               16,
               16,
-          )),
-      )
+          ),
+      ),
+  )
   def test_rate_learner(
       self,
       num_samples: int,

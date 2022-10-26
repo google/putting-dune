@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pyformat: mode=pyink
 """Entry point for standalone evaluation."""
 
 import dataclasses
@@ -28,6 +29,7 @@ from putting_dune import run_helpers
 @dataclasses.dataclass
 class Args:
   """Command line arguments."""
+
   video_save_dir: Optional[str] = None
 
 
@@ -51,17 +53,14 @@ def main(args: Args) -> None:
   assert isinstance(action_maximum, float)
 
   agent = agent_lib.UniformRandomAgent(
-      rng, action_minimum, action_maximum, action_spec.shape)
+      rng, action_minimum, action_maximum, action_spec.shape
+  )
 
   # Set up the eval suite.
   # TODO(joshgreaves): Specify specific eval suites.
   eval_suite = eval_lib.EvalSuite(tuple(range(10)))
 
-  eval_lib.evaluate(
-      agent,
-      env,
-      eval_suite,
-      video_save_dir=args.video_save_dir)
+  eval_lib.evaluate(agent, env, eval_suite, video_save_dir=args.video_save_dir)
 
 
 if __name__ == '__main__':
