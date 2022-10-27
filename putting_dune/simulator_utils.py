@@ -41,13 +41,6 @@ class SimulatorControl:
 
 
 @dataclasses.dataclass(frozen=True)
-class SimulatorObservation:
-  grid: AtomicGrid
-  last_probe_position: Optional[geometry.Point]
-  elapsed_time: dt.timedelta
-
-
-@dataclasses.dataclass(frozen=True)
 class SimulatorFieldOfView:
   """A class that tracks where the microscope is scanning at any given time.
 
@@ -115,3 +108,11 @@ class SimulatorObserver:
       fov: SimulatorFieldOfView,
   ) -> None:
     pass
+
+
+@dataclasses.dataclass(frozen=True)
+class SimulatorObservation:
+  grid: AtomicGrid
+  fov: SimulatorFieldOfView
+  last_probe_position: Optional[geometry.Point]
+  elapsed_time: dt.timedelta

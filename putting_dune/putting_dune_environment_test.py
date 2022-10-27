@@ -218,6 +218,8 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
 
     self.assertTrue(result.is_truncated)
 
+  # TODO(joshgreaves): Write tests for feature constructor.
+
 
 if __name__ == '__main__':
   absltest.main()

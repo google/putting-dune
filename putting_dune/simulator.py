@@ -82,7 +82,7 @@ class PuttingDuneSimulator:
     observed_grid = self._image_material()
 
     return simulator_utils.SimulatorObservation(
-        observed_grid, None, self.elapsed_time
+        observed_grid, self._fov, None, self.elapsed_time
     )
 
   def step_and_image(
@@ -140,6 +140,7 @@ class PuttingDuneSimulator:
 
     return simulator_utils.SimulatorObservation(
         observed_grid,
+        self._fov,
         controls[-1].position,
         self.elapsed_time,
     )

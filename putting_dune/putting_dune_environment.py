@@ -30,6 +30,7 @@ from putting_dune import plotting_utils
 from putting_dune import simulator
 from putting_dune import simulator_utils
 from shapely import geometry
+from sklearn import neighbors
 
 
 class RatePredictorType(str, enum.Enum):
@@ -137,6 +138,65 @@ class SingleSiliconGoalReaching:
     return GoalReturn(-cost, is_terminal, is_truncation)
 
 
+class SingleSiliconPristineGraphineFeatureConstuctor:
+  """A feature constructor assuming pristine graphene with single dopant."""
+
+  def reset(self) -> None:
+    # We include this because other feature constructors may be stateful.
+    # However, this one isn't.
+    pass
+
+  def get_features(
+      self,
+      observation: simulator_utils.SimulatorObservation,
+      goal: SingleSiliconGoalReaching,
+  ) -> np.ndarray:
+    """Gets features for an agent based on the osbervation and goal."""
+    silicon_position = graphene.get_silicon_positions(observation.grid).reshape(
+        2
+    )
+
+    # Get the vectors to the nearest neighbors.
+    nearest_neighbors = neighbors.NearestNeighbors(
+        n_neighbors=1 + 3,
+        metric='l2',
+        algorithm='brute',
+    ).fit(observation.grid.atom_positions)
+    neighbor_distances, neighbor_indices = nearest_neighbors.kneighbors(
+        silicon_position.reshape(1, 2)
+    )
+    neighbor_positions = observation.grid.atom_positions[
+        neighbor_indices[0, 1:]
+    ]
+    neighbor_deltas = neighbor_positions - silicon_position.reshape(1, 2)
+    neighbor_distances = neighbor_distances[0, 1:].reshape(-1, 1)
+    normalized_deltas = neighbor_deltas / neighbor_distances
+
+    material_frame_grid = observation.fov.microscope_grid_to_material_grid(
+        observation.grid
+    )
+    silicon_position_material_frame = graphene.get_silicon_positions(
+        material_frame_grid
+    ).reshape(2)
+    goal_delta_material_frame = (
+        goal.goal_position_material_frame - silicon_position_material_frame
+    )
+
+    obs = np.concatenate([
+        silicon_position,
+        normalized_deltas.reshape(-1),
+        goal_delta_material_frame,
+    ])
+
+    return obs.astype(np.float32)
+
+  def observation_spec(self) -> specs.Array:
+    # 2 for silicon position.
+    # 6 for 3 nearest neighbor delta vectors.
+    # 2 for goal delta.
+    return specs.Array((2 + 6 + 2,), np.float32)
+
+
 class PuttingDuneEnvironment(dm_env.Environment):
   """Putting Dune Environment."""
 
@@ -158,11 +218,15 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapters.RelativeToSiliconActionAdapter()
+    self._feature_constructor = SingleSiliconPristineGraphineFeatureConstuctor()
     self.goal = SingleSiliconGoalReaching()
 
     # Variables that will be set on reset.
     self._last_simulator_observation = simulator_utils.SimulatorObservation(
         simulator_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14])),
+        simulator_utils.SimulatorFieldOfView(
+            geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
+        ),
         None,
         dt.timedelta(seconds=0),
     )
@@ -183,39 +247,6 @@ class PuttingDuneEnvironment(dm_env.Environment):
     if hasattr(self._action_adapter, 'rng'):
       self._action_adapter.rng = self._rng
 
-  # TODO(joshgreaves): Abstract into ObservationConstructor.
-  def _make_observation(self):
-    silicon_position = graphene.get_silicon_positions(
-        self._last_simulator_observation.grid
-    ).reshape(2)
-
-    if self._last_simulator_observation.last_probe_position is None:
-      probe_position = getattr(self._action_adapter, 'beam_pos', np.zeros(2))
-    else:
-      probe_position = np.asarray(
-          self._last_simulator_observation.last_probe_position
-      )
-
-    # TODO(joshgreaves): Remove tight coupling to SinglSiliconGoalReaching.
-    # This won't be a problem once we abstract this into a separate
-    # class, since we can allow a suite of tightly-coupled items.
-    silicon_position_material_frame = self.sim.material.get_silicon_position()
-    goal_delta_material_frame = (
-        self.goal.goal_position_material_frame - silicon_position_material_frame
-    )
-    # TODO(joshgreaves): Maybe clip, or saturate in some way.
-    goal_delta_microscope_frame = np.asarray(
-        self.sim.convert_point_to_microscope_frame(
-            geometry.Point(goal_delta_material_frame)
-        )
-    )
-
-    obs = np.concatenate(
-        [silicon_position, probe_position, goal_delta_microscope_frame]
-    )
-
-    return obs.astype(np.float32)
-
   def reset(self) -> dm_env.TimeStep:
     # We won't need to reset immediately.
     self._requires_reset = False
@@ -223,13 +254,16 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # Generate a realistic doped graphene configuration.
     self._last_simulator_observation = self.sim.reset()
     self._action_adapter.reset()
+    self._feature_constructor.reset()
     self.goal.reset(self._rng, self._last_simulator_observation, self.sim)
 
     return dm_env.TimeStep(
         step_type=dm_env.StepType.FIRST,
         reward=0.0,
         discount=0.99,
-        observation=self._make_observation(),
+        observation=self._feature_constructor.get_features(
+            self._last_simulator_observation, self.goal
+        ),
     )
 
   def step(self, action: np.ndarray) -> dm_env.TimeStep:
@@ -251,7 +285,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     # 3. Create an observation with ObservationConstructor, using
     #    the new state returned from the simulator.
-    observation = self._make_observation()
+    observation = self._feature_constructor.get_features(
+        self._last_simulator_observation, self.goal
+    )
 
     # 4. Calculate the reward (and terminal?) using RewardFunction.
     # Perhaps never terminate to teach the agent to keep the silicon at goal?
@@ -274,8 +310,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     return self._action_adapter.action_spec
 
   def observation_spec(self) -> specs.Array:
-    obs_shape = self._make_observation().shape
-    return specs.Array(obs_shape, np.float32)
+    return self._feature_constructor.observation_spec()
 
   def render(self):
     fig = plt.figure(figsize=[5, 5])
