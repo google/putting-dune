@@ -73,32 +73,9 @@ class SingleSiliconGoalReaching:
     """
     del initial_observation  # Unused.
 
-    # An easy way to pick a goal that is not near an adge is to contract
-    # all the points, and then pick from the contracted points, and finally
-    # pick the closest original point to the selected contracted point.
-    max_atom_l2_distance = np.max(
-        np.linalg.norm(sim.material.atom_positions, axis=1)
+    self.goal_position_material_frame, _ = graphene.sample_point_away_from_edge(
+        rng, sim.material.atom_positions, sim.material.nearest_neighbors
     )
-    contraction = (
-        1 - 8 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS / max_atom_l2_distance
-    )
-    # Some very small grids might have a negative contraction, so clip it.
-    contraction = max(contraction, 0.1)
-    assert contraction < 1.0
-    contracted_points = sim.material.atom_positions * contraction
-
-    # Randomly select from the contracted points.
-    num_atoms, _ = contracted_points.shape
-    goal_position = contracted_points[rng.choice(num_atoms, 1)]
-
-    # Pick the point on the lattice closest to the contracted goal position.
-    _, neighbor_indices = sim.material.nearest_neighbors.kneighbors(
-        goal_position.reshape(1, 2)
-    )
-    self.goal_position_material_frame = sim.material.atom_positions[
-        neighbor_indices[0, 0]
-    ]
-
     self._consecutive_goal_steps = 0
 
   def caluclate_reward_and_terminal(

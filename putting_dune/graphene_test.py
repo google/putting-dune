@@ -230,6 +230,24 @@ class GrapheneTest(absltest.TestCase):
     p = sum(high_rate_transitioned_more_than_low_rate) / num_trials
     self.assertGreaterEqual(p, 0.9)
 
+  def test_graphene_initializes_silicon_away_from_edge(self):
+    # This simply tests that the silicon isn't initialized right on the edge.
+    # In fact, we should test that it isn't initialized _close_ to and edge,
+    # but we will skim over this for now 🤷‍♂️.
+    material = graphene.PristineSingleDopedGraphene(self.rng, grid_columns=10)
+
+    # Reset many times to check each initialization is not near an edge.
+    for _ in range(100):
+      material.reset()
+
+      neighbor_distances, _ = material.nearest_neighbors.kneighbors(
+          material.get_silicon_position().reshape(1, 2)
+      )
+      self.assertLessEqual(
+          neighbor_distances[0, -1],
+          graphene.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
+      )
+
 
 if __name__ == '__main__':
   absltest.main()
