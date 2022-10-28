@@ -15,7 +15,6 @@
 # pyformat: mode=pyink
 """Putting Dune Environment for use with RL agents."""
 
-import dataclasses
 import datetime as dt
 import enum
 from typing import Optional
@@ -25,6 +24,7 @@ from dm_env import specs
 import matplotlib.pyplot as plt
 import numpy as np
 from putting_dune import action_adapters
+from putting_dune import goals
 from putting_dune import graphene
 from putting_dune import plotting_utils
 from putting_dune import simulator
@@ -38,106 +38,6 @@ class RatePredictorType(str, enum.Enum):
   SIMPLE = 'simple'
 
 
-@dataclasses.dataclass(frozen=True)
-class GoalReturn:
-  reward: float
-  is_terminal: bool
-  is_truncated: bool
-
-
-# TODO(joshgreaves): Eventually add interface for this.
-class SingleSiliconGoalReaching:
-  """A single silicon goal-reaching goal."""
-
-  def __init__(self):
-    # For now, require only that we reach the goal. This makes
-    # the problem much less sparse, especially under the
-    # relative-to-silicon action adapter.
-    self._required_consecutive_goal_steps_for_termination = 1
-
-    # Will be set on reset.
-    self.goal_position_material_frame = np.zeros((2,), dtype=np.float32)
-    self._consecutive_goal_steps = 0
-
-  def reset(
-      self,
-      rng: np.random.Generator,
-      initial_observation: simulator_utils.SimulatorObservation,
-      sim: simulator.PuttingDuneSimulator,
-  ):
-    """Resets the goal, picking a new position.
-
-    Args:
-      rng: The RNG to use for sampling a new goal.
-      initial_observation: The initial simulator observation.
-      sim: The simulator in use.
-    """
-    del initial_observation  # Unused.
-
-    self.goal_position_material_frame, _ = graphene.sample_point_away_from_edge(
-        rng, sim.material.atom_positions, sim.material.nearest_neighbors
-    )
-    self._consecutive_goal_steps = 0
-
-  def caluclate_reward_and_terminal(
-      self,
-      observation: simulator_utils.SimulatorObservation,
-      sim: simulator.PuttingDuneSimulator,
-  ) -> GoalReturn:
-    """Calculates the reward and terminal signals for the goal.
-
-    Note: we assume that this is called once per simulator/agent step.
-
-    Args:
-      observation: The last observation from the simulator.
-      sim: The simulator being used.
-
-    Returns:
-      The reward, and whether the episode is terminal or should be
-        truncated. Truncation happens when atoms get to the edge of
-        the material and we can no longer simulate.
-    """
-    del observation  # Unused.
-
-    # Calculate the reward.
-    silicon_position_material_frame = sim.material.get_silicon_position()
-    cost = np.linalg.norm(
-        silicon_position_material_frame - self.goal_position_material_frame
-    )
-
-    # Update whether the silicon is near the goal.
-    goal_radius = graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
-    silicon_position_material_frame = sim.material.get_silicon_position()
-    goal_distance = np.linalg.norm(
-        silicon_position_material_frame - self.goal_position_material_frame
-    )
-    if goal_distance < goal_radius:
-      self._consecutive_goal_steps += 1
-    else:
-      self._consecutive_goal_steps = 0
-
-    # Calculate whether it is a terminal state.
-    is_terminal = (
-        self._consecutive_goal_steps
-        >= self._required_consecutive_goal_steps_for_termination
-    )
-
-    # Truncate if near the graphene edge.
-    si_neighbor_distances, _ = sim.material.nearest_neighbors.kneighbors(
-        silicon_position_material_frame.reshape(1, 2)
-    )
-
-    # If any of the neighbors are much greater than the expected bond distance,
-    # then there aren't three neighbors and we're at the edge.
-    # Since the neighbors are sorted, just look at the furthest neighbor.
-    is_truncation = (
-        si_neighbor_distances[0, -1]
-        > graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 1.1
-    )
-
-    return GoalReturn(-cost, is_terminal, is_truncation)
-
-
 class SingleSiliconPristineGraphineFeatureConstuctor:
   """A feature constructor assuming pristine graphene with single dopant."""
 
@@ -149,7 +49,7 @@ class SingleSiliconPristineGraphineFeatureConstuctor:
   def get_features(
       self,
       observation: simulator_utils.SimulatorObservation,
-      goal: SingleSiliconGoalReaching,
+      goal: goals.SingleSiliconGoalReaching,
   ) -> np.ndarray:
     """Gets features for an agent based on the osbervation and goal."""
     silicon_position = graphene.get_silicon_positions(observation.grid).reshape(
@@ -200,9 +100,7 @@ class SingleSiliconPristineGraphineFeatureConstuctor:
 class PuttingDuneEnvironment(dm_env.Environment):
   """Putting Dune Environment."""
 
-  def __init__(
-      self
-  ):
+  def __init__(self):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
@@ -214,7 +112,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapters.RelativeToSiliconActionAdapter()
     self._feature_constructor = SingleSiliconPristineGraphineFeatureConstuctor()
-    self.goal = SingleSiliconGoalReaching()
+    self.goal = goals.SingleSiliconGoalReaching()
 
     # Variables that will be set on reset.
     self._last_simulator_observation = simulator_utils.SimulatorObservation(
@@ -250,7 +148,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._last_simulator_observation = self.sim.reset()
     self._action_adapter.reset()
     self._feature_constructor.reset()
-    self.goal.reset(self._rng, self._last_simulator_observation, self.sim)
+    self.goal.reset(self._rng, self._last_simulator_observation)
 
     return dm_env.TimeStep(
         step_type=dm_env.StepType.FIRST,
@@ -287,7 +185,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # 4. Calculate the reward (and terminal?) using RewardFunction.
     # Perhaps never terminate to teach the agent to keep the silicon at goal?
     goal_return = self.goal.caluclate_reward_and_terminal(
-        self._last_simulator_observation, self.sim
+        self._last_simulator_observation
     )
 
     # TODO(joshgreaves): Make discount configurable.

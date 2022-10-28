@@ -20,9 +20,8 @@ from unittest import mock
 from absl.testing import absltest
 import dm_env
 import numpy as np
-from putting_dune import graphene
+from putting_dune import goals
 from putting_dune import putting_dune_environment
-from putting_dune import simulator
 
 
 # These actions are for the DeltaPositionActionAdapter.
@@ -108,7 +107,7 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
   def test_environment_obeys_reset_semantics_after_last_step(self):
     env = putting_dune_environment.PuttingDuneEnvironment()
     env.goal.caluclate_reward_and_terminal = mock.MagicMock(
-        return_value=putting_dune_environment.GoalReturn(
+        return_value=goals.GoalReturn(
             reward=0.0, is_terminal=True, is_truncated=False
         )
     )
@@ -126,7 +125,7 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
   def test_environment_truncates_correctly(self):
     env = putting_dune_environment.PuttingDuneEnvironment()
     env.goal.caluclate_reward_and_terminal = mock.MagicMock(
-        return_value=putting_dune_environment.GoalReturn(
+        return_value=goals.GoalReturn(
             reward=0.0, is_terminal=False, is_truncated=True
         )
     )
@@ -136,87 +135,6 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
     self.assertEqual(step.step_type, dm_env.StepType.LAST)
     self.assertGreater(step.discount, 0.0)
-
-
-class SingleSiliconGoalReachingTest(absltest.TestCase):
-
-  def setUp(self):
-    super().setUp()
-    self.rng = np.random.default_rng(0)
-    self.goal = putting_dune_environment.SingleSiliconGoalReaching()
-    # Make a small graphene sheet to more thoroughly test what happens
-    # at the edge of a graphene sheet.
-    self.material = graphene.PristineSingleDopedGraphene(
-        self.rng, grid_columns=10
-    )
-    self.sim = simulator.PuttingDuneSimulator(self.material)
-
-  def test_goal_position_is_set_to_a_lattice_position(self):
-    # Reset several times to check it's always a lattice position.
-    for _ in range(10):
-      obs = self.sim.reset()
-      self.goal.reset(self.rng, obs, self.sim)
-
-      neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
-          self.goal.goal_position_material_frame.reshape(1, -1)
-      )
-      self.assertLess(neighbor_distances[0, 0], 1e-3)
-
-  def test_goal_position_is_not_set_near_an_edge(self):
-    # Reset several times to check it's not near an edge.
-    for _ in range(100):
-      obs = self.sim.reset()
-      self.goal.reset(self.rng, obs, self.sim)
-
-      neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
-          self.goal.goal_position_material_frame.reshape(1, -1)
-      )
-      self.assertLessEqual(
-          neighbor_distances[0, -1],
-          graphene.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
-      )
-
-  def test_reward_increases_when_silicon_is_nearer_goal(self):
-    obs = self.sim.reset()
-    self.goal.reset(self.rng, obs, self.sim)
-
-    # Normally goals should be on the grid, but we can fake it for this test.
-    silicon_position = self.material.get_silicon_position()
-    closer_goal = silicon_position + np.asarray([5.0, 5.0], dtype=np.float32)
-    further_goal = silicon_position + np.asarray([-8.0, 5.0], dtype=np.float32)
-
-    self.goal.goal_position_material_frame = closer_goal
-    closer_result = self.goal.caluclate_reward_and_terminal(obs, self.sim)
-    self.goal.goal_position_material_frame = further_goal
-    further_result = self.goal.caluclate_reward_and_terminal(obs, self.sim)
-
-    self.assertGreater(closer_result.reward, further_result.reward)
-
-  def test_returns_terminal_when_silicon_is_at_goal(self):
-    obs = self.sim.reset()
-    self.goal.reset(self.rng, obs, self.sim)
-    self.material.get_silicon_position = mock.MagicMock(
-        return_value=self.goal.goal_position_material_frame
-    )
-
-    result = self.goal.caluclate_reward_and_terminal(obs, self.sim)
-
-    self.assertTrue(result.is_terminal)
-
-  def test_truncation_is_applied_at_graphene_edge(self):
-    obs = self.sim.reset()
-    self.goal.reset(self.rng, obs, self.sim)
-
-    # Manually position the silicon at the further position from the
-    # center, which is guaranteed to be a edge (a corner, specifically).
-    atom_distances = np.linalg.norm(self.material.atom_positions, axis=1)
-    furthest_idx = np.argmax(atom_distances)
-    self.material.atomic_numbers[:] = graphene.CARBON
-    self.material.atomic_numbers[furthest_idx] = graphene.SILICON
-
-    result = self.goal.caluclate_reward_and_terminal(obs, self.sim)
-
-    self.assertTrue(result.is_truncated)
 
   # TODO(joshgreaves): Write tests for feature constructor.
 
