@@ -17,7 +17,7 @@
 
 import dataclasses
 import os
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from absl import logging
 import dm_env
@@ -29,7 +29,7 @@ from putting_dune import simulator_observers
 
 @dataclasses.dataclass(frozen=True)
 class EvalSuite:
-  seeds: tuple[int, ...]
+  seeds: Tuple[int, ...]
 
 
 @dataclasses.dataclass
@@ -47,7 +47,7 @@ def evaluate(
     eval_suite: EvalSuite,
     *,
     video_save_dir: Optional[str] = None,
-) -> list[EvalResult]:
+) -> List[EvalResult]:
   """Evaluates an agent on the specified environment and evaluation suite.
 
   Args:

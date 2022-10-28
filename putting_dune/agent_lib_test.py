@@ -15,6 +15,8 @@
 # pyformat: mode=pyink
 """Tests for agent."""
 
+from typing import Tuple
+
 from absl.testing import absltest
 from absl.testing import parameterized
 import dm_env
@@ -53,7 +55,7 @@ class AgentTest(parameterized.TestCase):
       dict(testcase_name='multidimensional', shape=(4, 3, 2)),
   )
   def test_uniform_agent_selects_actions_with_correct_shape(
-      self, shape: tuple[int, ...]
+      self, shape: Tuple[int, ...]
   ):
     agent = agent_lib.UniformRandomAgent(self._rng, 0.0, 1.0, shape)
 

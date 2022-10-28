@@ -16,7 +16,7 @@
 """Useful utility functions for plotting."""
 
 import datetime as dt
-from typing import Any, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from matplotlib import animation
 from matplotlib import pyplot as plt
@@ -151,12 +151,12 @@ def generate_video_from_simulator_events(
   grid: simulator_utils.AtomicGrid = None
   fov: simulator_utils.SimulatorFieldOfView = None
   control_position: np.ndarray = None
-  frames: list[dict[str, Any]] = []
+  frames: List[Dict[str, Any]] = []
 
   fig = plt.figure(figsize=(8, 4))
   ax1, ax2 = fig.subplots(1, 2)
 
-  def plot_frame(args: dict[str, Any]) -> None:
+  def plot_frame(args: Dict[str, Any]) -> None:
     ax1.clear()
     ax2.clear()
 

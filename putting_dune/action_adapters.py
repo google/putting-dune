@@ -17,6 +17,7 @@
 
 import abc
 import datetime as dt
+from typing import List
 
 from absl import logging
 from dm_env import specs
@@ -42,7 +43,7 @@ class ActionAdapter(abc.ABC):
       self,
       grid: simulator_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> list[simulator_utils.SimulatorControl]:
+  ) -> List[simulator_utils.SimulatorControl]:
     """Gets simulator controls from the agent action."""
 
   @property
@@ -69,7 +70,7 @@ class DeltaPositionActionAdapter(ActionAdapter):
       self,
       grid: simulator_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> list[simulator_utils.SimulatorControl]:
+  ) -> List[simulator_utils.SimulatorControl]:
     del grid  # Unused.
 
     self.beam_pos += action
@@ -103,7 +104,7 @@ class RelativeToSiliconActionAdapter:
       self,
       grid: simulator_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> list[simulator_utils.SimulatorControl]:
+  ) -> List[simulator_utils.SimulatorControl]:
     """Gets simulator controls from the agent action."""
     silicon_position = graphene.get_silicon_positions(grid)
 

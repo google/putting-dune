@@ -17,7 +17,7 @@
 
 import abc
 import datetime as dt
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Tuple
 
 import numpy as np
 from putting_dune import simulator_utils
@@ -151,7 +151,7 @@ def sample_point_away_from_edge(
     nearest_neighbors: neighbors.NearestNeighbors,
     *,
     border_atom_positions: int = 8,
-) -> tuple[np.ndarray, int]:
+) -> Tuple[np.ndarray, int]:
   """Samples a point away from the edge of an atomic grid.
 
   Args:

@@ -18,7 +18,7 @@
 import dataclasses
 import datetime as dt
 import enum
-from typing import Any
+from typing import Any, Dict
 
 from putting_dune import simulator_utils
 
@@ -35,7 +35,7 @@ class SimulatorEvent:
   event_type: SimulatorEventType
   start_time: dt.timedelta
   end_time: dt.timedelta
-  event_data: dict[str, Any]  # Not ideal, but saves a lot of boilerplate.
+  event_data: Dict[str, Any]  # Not ideal, but saves a lot of boilerplate.
 
 
 class EventObserver(simulator_utils.SimulatorObserver):

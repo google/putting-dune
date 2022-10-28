@@ -15,8 +15,9 @@
 # pyformat: mode=pyink
 """Tests for plotting_utils."""
 
-from absl.testing import absltest
+from typing import List
 
+from absl.testing import absltest
 from matplotlib import animation
 import numpy as np
 from putting_dune import agent_lib
@@ -26,7 +27,7 @@ from putting_dune import simulator_observers
 
 
 def _generate_events_with_random_policy() -> (
-    list[simulator_observers.SimulatorEvent]
+    List[simulator_observers.SimulatorEvent]
 ):
   env = run_helpers.create_putting_dune_env(seed=0, step_limit=5)
   rng = np.random.default_rng(0)
