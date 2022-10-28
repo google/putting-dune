@@ -1,5 +1,5 @@
 [project]
-name = "putting-dune"
+name = "putting_dune"
 description = "Putting Dune."
 readme = "README.md"
 requires-python = ">=3.7"
@@ -14,7 +14,17 @@ classifiers = [
 keywords = []
 
 # pip dependencies of the project
-dependencies = []
+dependencies = [
+    "absl-py",
+    "dm-acme",
+    "dm_env",
+    "etils>=0.9.0",
+    "etils[eapp]>=0.9.0",
+    "matplotlib",
+    "numpy",
+    "shapely",
+    "sklearn",
+]
 
 # This is set automatically by flit using `putting_dune.__version__`
 dynamic = ["version"]
