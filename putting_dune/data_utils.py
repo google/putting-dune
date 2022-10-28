@@ -23,8 +23,13 @@ from typing import Mapping, Optional, Tuple
 import jax
 from jax import numpy as jnp
 import numpy as np
-from putting_dune import graphene
 from putting_dune import rate_learning
+
+
+# TODO(joshgreaves): Avoid duplicating these values.
+PRIOR_RATE_MEAN = np.array((0.85, 0))
+PRIOR_RATE_COV = np.array(((0.1, 0), (0, 0.1)))
+PRIOR_MAX_RATE = np.log(2) / 3
 
 
 class SyntheticDataType(str, enum.Enum):
@@ -244,13 +249,13 @@ def generate_synthetic_data(
         context_key,
     ) = jax.random.split(key, 5)
     context = sample_multivariate_context(
-        context_key, graphene.PRIOR_RATE_MEAN, graphene.PRIOR_RATE_COV * 1.5
+        context_key, PRIOR_RATE_MEAN, PRIOR_RATE_COV * 1.5
     )
     rates = prior_rates(
         get_all_context_rotations(context, num_states=num_states),
-        mean=graphene.PRIOR_RATE_MEAN,
-        cov=graphene.PRIOR_RATE_COV,
-        max_rate=graphene.PRIOR_MAX_RATE,
+        mean=PRIOR_RATE_MEAN,
+        cov=PRIOR_RATE_COV,
+        max_rate=PRIOR_MAX_RATE,
     )
     total_rate = jnp.sum(rates, -1)
     p = rates / total_rate

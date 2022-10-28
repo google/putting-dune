@@ -20,7 +20,6 @@ import datetime as dt
 from typing import Callable, Iterable
 
 import numpy as np
-from putting_dune import data_utils
 from putting_dune import simulator_utils
 from shapely import geometry
 from sklearn import neighbors
@@ -30,71 +29,6 @@ CARBON = 6
 SILICON = 14
 
 CARBON_BOND_DISTANCE_ANGSTROMS = 1.42
-
-PRIOR_RATE_MEAN = np.array((0.85, 0))
-PRIOR_RATE_COV = np.array(((0.1, 0), (0, 0.1)))
-PRIOR_MAX_RATE = np.log(2) / 3
-
-
-class HumanPriorRatePredictor:
-  """Implements rate prediction according to a human-designed prior.
-
-  Attributes:
-    mean: Point for which transition is most likely, relative to a neighbor
-      located at (1, 0).
-    cov: Assuming Gaussian falloff of transition rates, the covariance matrix
-      describing the shape of the distribution.
-    max_rate: The maximum rate (as lambda of an exponential distribution) at the
-      center of the peak.
-  """
-
-  def __init__(
-      self,
-      mean: np.ndarray = PRIOR_RATE_MEAN,
-      cov: np.ndarray = PRIOR_RATE_COV,
-      max_rate: float = PRIOR_MAX_RATE,
-  ):
-    self.mean = mean
-    self.cov = cov
-    self.max_rate = max_rate
-
-  def predict(
-      self,
-      grid: simulator_utils.AtomicGrid,
-      beam_pos: geometry.Point,
-      current_position: np.ndarray,
-      neighbor_indices: np.ndarray,
-  ) -> np.ndarray:
-    """Computes rate constants for transitioning a Si atom.
-
-    Args:
-      grid: Atomic grid state.
-      beam_pos: 2-dimensional beam position in material coordinate frame.
-      current_position: 2-dimensional position of the current silicon atom.
-      neighbor_indices: Indices of the atoms on the grid to calculate rates for.
-
-    Returns:
-      a 3-dimensional array of rate constants for transitioning to the 3
-        nearest neighbors.
-    """
-    # Convert the beam_pos into a numpy array for convenience
-    beam_pos = np.asarray([[beam_pos.x, beam_pos.y]])  # Shape = [1, -1]
-
-    neighbor_positions = grid.atom_positions[neighbor_indices, :]
-    relative_neighbor_positions = neighbor_positions - current_position
-    angles = data_utils.get_neighbor_angles(relative_neighbor_positions)
-
-    relative_beam_position = beam_pos - current_position
-    relative_beam_position /= CARBON_BOND_DISTANCE_ANGSTROMS
-    rates = np.zeros((neighbor_indices.shape), dtype=float)
-    for i, angle in enumerate(angles):
-      rotated_mean = data_utils.rotate_coordinates(self.mean, -angle)
-      rate = data_utils.prior_rates(
-          relative_beam_position, rotated_mean, self.cov, self.max_rate
-      )
-      rates[i] = rate
-
-    return rates
 
 
 def simple_transition_rates(
@@ -277,7 +211,7 @@ class PristineSingleDopedGraphene(Material):
       self,
       rng: np.random.Generator,
       *,
-      predict_rates: RatePredictionFn = HumanPriorRatePredictor().predict,
+      predict_rates: RatePredictionFn = simple_transition_rates,
       grid_columns: int = 50,
   ):
     self.rng = rng

@@ -108,14 +108,6 @@ class GrapheneTest(absltest.TestCase):
     num_silicon = np.sum(material.atomic_numbers == graphene.SILICON)
     self.assertEqual(num_silicon, 1)
 
-  def test_human_prior_rates(self):
-    transition_model = graphene.HumanPriorRatePredictor()
-    material = graphene.PristineSingleDopedGraphene(
-        self.rng, predict_rates=transition_model.predict
-    )
-
-    material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
-
   def test_get_atoms_in_bounds_gets_correct_atoms(self):
     material = graphene.PristineSingleDopedGraphene(self.rng)
 

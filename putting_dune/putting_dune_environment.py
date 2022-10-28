@@ -201,19 +201,14 @@ class PuttingDuneEnvironment(dm_env.Environment):
   """Putting Dune Environment."""
 
   def __init__(
-      self, rate_predictor_type: RatePredictorType = RatePredictorType.PRIOR
+      self
   ):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
-    # TODO(joshgreaves): Make the material configurable.
-    if rate_predictor_type == RatePredictorType.PRIOR:
-      self.rate_predictor = graphene.HumanPriorRatePredictor().predict
-    else:
-      self.rate_predictor = graphene.simple_transition_rates
-
+    rate_predictor = graphene.simple_transition_rates
     self._material = graphene.PristineSingleDopedGraphene(
-        self._rng, predict_rates=self.rate_predictor
+        self._rng, predict_rates=rate_predictor
     )
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
