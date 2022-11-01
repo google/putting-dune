@@ -162,6 +162,7 @@ class GrapheneTest(absltest.TestCase):
 
     atom_positions_before = np.copy(material.atom_positions)
     atomic_numbers_before = np.copy(material.atomic_numbers)
+
     material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
     atom_positions_after = np.copy(material.atom_positions)
     atomic_numbers_after = np.copy(material.atomic_numbers)

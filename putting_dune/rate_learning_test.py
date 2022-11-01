@@ -21,10 +21,24 @@ from typing import Tuple
 from absl.testing import absltest
 from absl.testing import parameterized
 import jax
+from ml_collections import config_dict
 import numpy as np
 import optax
 from putting_dune import data_utils
 from putting_dune import rate_learning
+
+
+debug_default_config = config_dict.FrozenConfigDict({
+    'batch_size': 32,
+    'epochs': 1,
+    'synthetic_samples': 500,
+    'num_models': 1,
+    'bootstrap': False,
+    'hidden_dims': (64, 64),
+    'weight_decay': 1e-1,
+    'learning_rate': 1e-3,
+    'val_frac': 0.1
+})
 
 
 class RateLearningTest(parameterized.TestCase):
@@ -79,20 +93,77 @@ class RateLearningTest(parameterized.TestCase):
 
     init_fn, apply_fn = rate_learning.get_mlp_fn(mlp_dims, num_states)
     optim = optax.adamw(1e-3, weight_decay=0.1)
+    key = jax.random.PRNGKey(42)
+    init_params = init_fn(key, train_data['context'][0],)
 
     params, _ = rate_learning.train_model(
         train_data,
         test_data,
+        key,
+        init_params,
         apply_fn,
-        init_fn,
-        jax.random.PRNGKey(int(time.time())),
         optim,
-        batch_size=32,
-        epochs=1,
+        train_args=debug_default_config,
     )
 
     self.assertIsNotNone(params)
 
+
+class RatePredictorTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='small_scale',
+          num_samples=100,
+          num_states=3,
+          context_dim=2,
+          actual_time_range=(0., 5.0),
+          test_inputs=[np.array([1, 0]),
+                       np.array([-.5, 0.866]),
+                       np.array([-.5, -0.866])],
+          test_argmaxes=[0, 1, 2],
+          mode='prior',
+      ),
+      dict(
+          testcase_name='large_scale',
+          num_samples=1000,
+          num_states=3,
+          context_dim=2,
+          actual_time_range=(0., 5.0),
+          test_inputs=[np.array([1, 0]),
+                       np.array([-.5, 0.866]),
+                       np.array([-.5, -0.866])],
+          test_argmaxes=[0, 1, 2],
+          mode='prior',
+      ))
+  def test_rate_learner(
+      self,
+      num_samples: int,
+      num_states: int,
+      context_dim: int,
+      actual_time_range: Tuple[float, float],
+      test_inputs: Tuple[np.ndarray, ...],
+      test_argmaxes: Tuple[int, ...],
+      mode: str,
+  ):
+    train_data, _ = data_utils.generate_synthetic_data(
+        num_data=num_samples,
+        data_seed=None,
+        num_states=num_states,
+        context_dim=context_dim,
+        actual_time_range=actual_time_range,
+        mode=mode,
+    )
+
+    key = jax.random.PRNGKey(int(time.time()))
+    learner = rate_learning.LearnedTransitionRatePredictor(init_key=key,)
+
+    learner.train(train_data, key)
+    self.assertIsNotNone(learner.params)
+
+    for x, y in zip(test_inputs, test_argmaxes):
+      rates = learner.apply_model(x, key)
+      self.assertEqual(np.argmax(rates), y)
 
 if __name__ == '__main__':
   absltest.main()

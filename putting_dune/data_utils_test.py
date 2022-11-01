@@ -20,6 +20,7 @@ from typing import Tuple
 
 from absl.testing import absltest
 from absl.testing import parameterized
+import jax
 import numpy as np
 from putting_dune import data_utils
 
@@ -180,6 +181,52 @@ class DataUtilsTest(parameterized.TestCase):
     np.testing.assert_allclose(state_order, target_order, rtol=1e-6)
     np.testing.assert_allclose(angles, target_angles, rtol=1e-6)
 
+  def test_data_splitting(
+      self,
+  ):
+    train_data, _ = data_utils.generate_synthetic_data(
+        num_data=1000,
+        data_seed=None,
+        num_states=3,
+        context_dim=2,
+        actual_time_range=(0, 10),
+        mode='prior',
+    )
+    train_data, val_data = data_utils.split_dataset(
+        train_data, jax.random.PRNGKey(42), 0.1)
+
+    new_train_len = 900
+    validation_len = 100
+    self.assertEqual(train_data['context'].shape, (new_train_len, 2))
+    self.assertEqual(val_data['context'].shape, (validation_len, 2))
+
+  def test_bootstrapping(
+      self,
+  ):
+    train_data, _ = data_utils.generate_synthetic_data(
+        num_data=1000,
+        data_seed=None,
+        num_states=3,
+        context_dim=2,
+        actual_time_range=(0, 10),
+        mode='prior',
+    )
+    key = jax.random.PRNGKey(42)
+    keys = jax.random.split(key, 100)
+
+    bootstrapped_datasets = [data_utils.bootstrap_dataset(train_data, key)
+                             for key in keys]
+    train_datasets = [d[0] for d in bootstrapped_datasets]
+    val_datasets = [d[1] for d in bootstrapped_datasets]
+
+    target_shapes = [train_data['context'].shape]*len(keys)
+    bootstrapped_shapes = [d['context'].shape for d in train_datasets]
+    self.assertListEqual(target_shapes, bootstrapped_shapes)
+
+    val_lengths = [d['context'].shape[0] for d in val_datasets]
+
+    mean_val_length = np.mean(val_lengths)
+    np.testing.assert_almost_equal(mean_val_length, 1000/np.e, decimal=1)
 
 if __name__ == '__main__':
   absltest.main()

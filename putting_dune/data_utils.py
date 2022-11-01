@@ -322,7 +322,35 @@ def bootstrap_dataset(data: Mapping[str, np.ndarray], rng: jnp.ndarray):
   train_data = {k: a[indices] for k, a in data.items()}
   test_indices = set(range(original_length)) - set(np.array(indices))
   test_indices = np.array(list(test_indices))
-  test_data = {k: a[test_indices] for k, a in test_indices}
+  test_data = {k: a[test_indices] for k, a in data.items()}
+  return train_data, test_data
+
+
+def split_dataset(data: Mapping[str, np.ndarray],
+                  rng: jnp.ndarray,
+                  test_fraction: float = 0.1,
+                  ) -> Tuple[Mapping[str, np.ndarray], ...]:
+  """Splits a dataset to generate a training and testing dataset.
+
+  Args:
+    data: training dataset. Dictionary of arrays with same first dim.
+    rng: JAX prngkey.
+    test_fraction: float in [0, 1]. Fraction of data to put in val set.
+
+  Returns:
+    train_data: training data.
+    test_data: Testing data (samples excluded from train_data).
+  """
+  original_length = list(data.values())[0].shape[0]
+  indices = jax.random.choice(
+      rng,
+      a=original_length,
+      shape=[original_length],
+      replace=False)
+  train_indices = indices[int(original_length*test_fraction):]
+  test_indices = indices[:int(original_length*test_fraction)]
+  train_data = {k: a[train_indices] for k, a in data.items()}
+  test_data = {k: a[test_indices] for k, a in data.items()}
   return train_data, test_data
 
 

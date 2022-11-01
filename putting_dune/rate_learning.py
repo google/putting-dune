@@ -17,17 +17,41 @@
 
 from collections.abc import Callable, Mapping, Sequence
 import functools
-from typing import Any
+import os
+from typing import Any, Optional
 
 from absl import app
+from etils import epath
+import flax
 import haiku as hk
 import jax
 from jax import numpy as jnp
+from ml_collections import config_dict
+import numpy as np
 import optax
 from putting_dune import data_utils
+from putting_dune import graphene
+from putting_dune import simulator_utils
+from shapely import geometry
 
+
+rate_learning_defaults = config_dict.FrozenConfigDict({
+    'batch_size': 64,
+    'epochs': 1000,
+    'synthetic_samples': 100,
+    'num_models': 1,
+    'bootstrap': False,
+    'hidden_dimensions': (64, 64),
+    'weight_decay': 1e-1,
+    'learning_rate': 1e-3,
+    'val_frac': 0.1,
+})
 
 Params = Mapping[str, Any]
+
+
+def tree_stack(list_of_trees: Sequence[Params]) -> Params:
+  return jax.tree_util.tree_map(lambda *x: jnp.stack(x, 0), *list_of_trees)
 
 
 class MLP(hk.Module):
@@ -175,44 +199,44 @@ def train_epoch(
 
 
 @functools.partial(
-    jax.jit,
-    static_argnames=('batch_size', 'optim', 'epochs', 'apply_fn', 'init_fn'),
+    jax.jit, static_argnames=('optim', 'train_args', 'apply_fn', 'init_fn')
 )
 def train_model(
     train_data: Mapping[str, jnp.ndarray],
     test_data: Mapping[str, jnp.ndarray],
-    apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray], jnp.ndarray],
-    init_fn,
     key: jnp.ndarray,
+    params: Params,
+    apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray], jnp.ndarray],
     optim: optax.GradientTransformation,
-    batch_size: int = 32,
-    epochs: int = 10,
+    train_args: config_dict.FrozenConfigDict = rate_learning_defaults,
 ):
   """Trains a rate prediction model from scratch.
 
   Args:
     train_data: Training data. Dictionary of arrays.
     test_data: Testing data. Dictionary of arrays.
-    apply_fn: Haiku model application function.
-    init_fn: Haiku model initialization function.
     key: JAX prng key.
+    params: Starting model parameters from haiku's init_fn.
+    apply_fn: Haiku model application function.
     optim: Optax optimizer.
-    batch_size: Batch size to use in training.
-    epochs: Number of epochs to train for.
+    train_args: Config dictionary listing batch size and number of epochs.
 
   Returns:
     model parameters.
     tuple of training metrics.
   """
-  context_dim = train_data['context'].shape[1]
-  init_key, key = jax.random.split(key)
-  params = init_fn(x=jnp.zeros(context_dim), rng=init_key)
   opt_state = optim.init((params))
 
   def do_epoch(state, key):
     params, opt_state, train_data, test_data = state
     params, opt_state, key = train_epoch(
-        params, opt_state, optim, apply_fn, batch_size, key, train_data
+        params,
+        opt_state,
+        optim,
+        apply_fn,
+        train_args['batch_size'],
+        key,
+        train_data,
     )
 
     test_loss, (_, test_rate_loss, test_class_loss) = batched_loss_fn(
@@ -259,7 +283,23 @@ def train_model(
   ) = jax.lax.scan(
       do_epoch,
       (params, opt_state, train_data, test_data),
-      jax.random.split(key, num=epochs),
+      jax.random.split(key, num=train_args['epochs']),
+  )
+
+  (
+      (params, opt_state, _, _),
+      (
+          train_loss,
+          test_loss,
+          train_rate_loss,
+          test_rate_loss,
+          train_class_loss,
+          test_class_loss,
+      ),
+  ) = jax.lax.scan(
+      do_epoch,
+      (params, opt_state, train_data, test_data),
+      jax.random.split(key, num=train_args['epochs']),
   )
 
   return (
@@ -275,13 +315,16 @@ def train_model(
   )
 
 
-def bootstrap_train_models(
+def train_multiple_models(
     train_data: Mapping[str, jnp.ndarray],
     key: jnp.ndarray,
     num_models: int,
-    hidden_dimensions: Sequence[int],
-    num_states: int,
-    *args,
+    optim: optax.GradientTransformation,
+    apply_fn: Callable[[Params, jnp.ndarray, jnp.ndarray], jnp.ndarray],
+    init_fn: Callable[[jnp.ndarray, jnp.ndarray], Params],
+    bootstrap: bool = True,
+    test_fraction: float = 0.1,
+    train_config: config_dict.FrozenConfigDict = rate_learning_defaults,
 ):
   """Trains a set of models on a single dataset by bootstrapping.
 
@@ -289,36 +332,198 @@ def bootstrap_train_models(
     train_data: Dictionary of training arrays.
     key: PRNG key.
     num_models: How many models to train.
-    hidden_dimensions: tuple, arguments to pass for model size.
-    num_states: int, how many outputs the model should predict.
-    *args: Additional arguments for the training function (batch size, etc).
+    optim: Optax optimizer.
+    apply_fn: Haiku model application function.
+    init_fn: Haiku model initialization function.
+    bootstrap: whether to bootstrap or just split datasets.
+    test_fraction: what fraction of data to use for eval if not bootstrapping.
+    train_config: Additional training arguments (config dict).
 
   Returns:
     List of models and training metrics, stacked along axis 0.
   """
-  data_key, train_key = jax.random.split(key, 2)
+  data_key, train_key, init_key = jax.random.split(key, 3)
   data_keys = jax.random.split(data_key, num_models)
   train_keys = jax.random.split(train_key, num_models)
 
-  datasets = [
-      data_utils.bootstrap_dataset(train_data, key) for key in data_keys
-  ]
-  train_datasets = [d[0] for d in datasets]
-  test_datasets = [d[1] for d in datasets]
-  test_set_len = min([a[0].shape[0] for a in test_datasets])
-  test_datasets = [[a[:test_set_len] for a in d] for d in test_datasets]
+  if bootstrap:
+    datasets = [
+        data_utils.bootstrap_dataset(train_data, key) for key in data_keys
+    ]
+    train_datasets = [d[0] for d in datasets]
+    test_datasets = [d[1] for d in datasets]
+    test_set_len = min([a['context'].shape[0] for a in test_datasets])
+    test_datasets = [
+        {k: a[:test_set_len] for k, a in d.items()} for d in test_datasets
+    ]
+  elif 1.0 > test_fraction > 0.0:
+    datasets = [
+        data_utils.split_dataset(train_data, key, test_fraction)
+        for key in data_keys
+    ]
+    train_datasets = [d[0] for d in datasets]
+    test_datasets = [d[1] for d in datasets]
+  else:
+    assert test_fraction == 0
+    train_datasets = [train_data] * num_models
+    test_datasets = [train_data] * num_models
 
   train_datasets = {
       k: jnp.stack([d[k] for d in train_datasets]) for k in train_data.keys()
   }
-  train_datasets = {
+  test_datasets = {
       k: jnp.stack([d[k] for d in test_datasets]) for k in train_data.keys()
   }
-  init_fn, apply_fn = get_mlp_fn(hidden_dimensions, num_states)
-  batch_train = jax.vmap(train_model, in_axes=(0, 0, 0, None, None, None))
+  init_context = train_data['context'][0]
+  init_keys = jax.random.split(init_key, num_models)
+  params = [init_fn(key, init_context) for key in init_keys]
+  init_params = tree_stack(params)
+  batch_train = jax.vmap(train_model, in_axes=(0, 0, 0, 0, None, None, None))
   return batch_train(
-      train_datasets, test_datasets, apply_fn, init_fn, train_keys, *args
+      train_datasets,
+      test_datasets,
+      train_keys,
+      init_params,
+      apply_fn,
+      optim,
+      train_config,
   )
+
+
+class LearnedTransitionRatePredictor:
+  """Class wrapping rate learning and prediction."""
+
+  def __init__(
+      self,
+      init_key: jnp.ndarray,
+      num_states: int = 3,
+      context_dim: int = 2,
+      config: config_dict.FrozenConfigDict = rate_learning_defaults,
+  ):
+    self.init_fn, self.apply_fn = get_mlp_fn(
+        config.hidden_dimensions, num_states
+    )
+    self.rng, *keys = jax.random.split(init_key, config.num_models + 1)
+    params = [self.init_fn(x=jnp.zeros(context_dim), rng=key) for key in keys]
+    self.params = tree_stack(params)
+    self.params = self.init_fn(x=jnp.zeros(context_dim), rng=init_key)
+    self.context_dim = context_dim
+    self.num_states = num_states
+
+    self.config = config
+
+    @jax.jit
+    @functools.partial(jax.vmap, in_axes=(0, None, None))
+    def batch_apply(params, x, rng):
+      return self.apply_fn(params, rng, x)
+
+    self.batch_apply = batch_apply
+
+    @jax.jit
+    def apply_single_model(model_index, params, x, rng):
+      params = jax.tree_util.tree_map(lambda x: x[model_index], params)
+      return self.apply_fn(params, rng, x)
+
+    self.apply_single_model = jax.jit(apply_single_model)
+
+  def apply_model(
+      self,
+      x: np.ndarray,
+      key: jnp.ndarray,
+      model_index: Optional[int] = None,
+  ) -> np.ndarray:
+    if model_index is None:
+      return self.batch_apply(self.params, x, key).mean(0)
+    else:
+      return self.apply_single_model(model_index, self.params, x, key)
+
+  def train(
+      self,
+      train_data: Mapping[str, jnp.ndarray],
+      key: jnp.ndarray,
+      bootstrap=True,
+  ):
+    """Trains one or more rate prediction models from a dataset.
+
+    Args:
+      train_data: Dictionary of training arrays.
+      key: PRNG key.
+      bootstrap: Whether to bootstrap training data for each model.
+
+    Returns:
+      Training metrics.
+    """
+    self.rng, train_key = jax.random.split(key, 2)
+    optim = optax.adamw(
+        self.config.learning_rate, weight_decay=self.config.weight_decay
+    )
+    self.params, train_metrics = train_multiple_models(
+        train_data,
+        train_key,
+        num_models=self.config.num_models,
+        optim=optim,
+        init_fn=self.init_fn,
+        apply_fn=self.apply_fn,
+        bootstrap=bootstrap,
+        test_fraction=self.config.val_frac,
+        train_config=self.config,
+    )
+
+    return train_metrics
+
+  def save(self, save_path: str, step: int) -> None:
+    fn = os.path.join(save_path, str(step) + '.ckpt')
+    path = epath.Path(fn)
+    path.mkdir(parents=True, exist_ok=True)
+    with path.open(fn, 'wb') as f:
+      f.write(flax.serialization.to_bytes(self.params))
+
+  def load(self, load_path: str, step: int = 0) -> None:
+    path = epath.Path(load_path)
+    with path.open(os.path.join(load_path, str(step) + '.ckpt'), 'rb') as f:
+      self.params = flax.serialization.from_bytes(self.params, f.read())
+
+  def predict(
+      self,
+      grid: simulator_utils.AtomicGrid,
+      beam_pos: geometry.Point,
+      current_position: np.ndarray,
+      neighbor_indices: np.ndarray,
+      model_index: Optional[int] = None,
+  ) -> np.ndarray:
+    """Computes rate constants for transitioning a Si atom.
+
+    Args:
+      grid: Atomic grid state.
+      beam_pos: 2-dimensional beam position in [0, 1] coordinate frame.
+      current_position: 2-dimensional position of current silicon atom.
+      neighbor_indices: Indices of the atoms on the grid to calculate rates for.
+      model_index: which model to apply, if the predictor has an ensemble.
+        Defaults to averaging all of them.
+
+    Returns:
+      a 3-dimensional array of rate constants for transitioning to the 3
+        nearest neighbors.
+    """
+    # Convert the beam_pos into a numpy array for convenience
+    beam_pos = np.asarray([[beam_pos.x, beam_pos.y]])  # Shape = [1, -1]
+    neighbor_positions = grid.atom_positions[neighbor_indices, :]
+    neighbor_positions = neighbor_positions - current_position
+    beam_pos = beam_pos - current_position
+    beam_pos = beam_pos / graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+    new_beam_pos, neighbor_order, _ = data_utils.standardize_beam_and_neighbors(
+        beam_pos,
+        neighbor_positions,
+    )
+    self.rng, key = jax.random.split(self.rng)
+
+    rates = self.apply_model(key, new_beam_pos, model_index=model_index)
+
+    # neighbor_order is an array mapping the canonical order of neighbors
+    # (increasing angle from (1, 0)) to the order they were given in.
+    # We can invert it with argsort to return the rates to the correct order.
+    rates = rates[np.argsort(neighbor_order)]
+    return rates
 
 
 def main(argv: Sequence[str]) -> None:
