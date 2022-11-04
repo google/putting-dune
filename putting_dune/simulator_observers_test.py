@@ -36,7 +36,7 @@ class SimulatorObserversTest(absltest.TestCase):
     observer.observe_reset(grid, fov)
     observer.observe_apply_control(
         dt.timedelta(seconds=1.0),
-        simulator_utils.SimulatorControl(
+        simulator_utils.BeamControl(
             geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)
         ),
     )

@@ -24,7 +24,7 @@ from putting_dune import graphene
 from putting_dune import simulator_utils
 from shapely import geometry
 
-_ARBITRARY_CONTROL = simulator_utils.SimulatorControl(
+_ARBITRARY_CONTROL = simulator_utils.BeamControl(
     geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
 )
 _ARBITRARY_TIME = dt.timedelta(seconds=1.0)

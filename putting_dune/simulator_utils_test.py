@@ -15,9 +15,12 @@
 # pyformat: mode=pyink
 """Tests for simulator_utils."""
 
+import datetime
+
 from absl.testing import absltest
 import numpy as np
 from putting_dune import simulator_utils
+from putting_dune.google import putting_dune_pb2  # pylint: disable=g-bad-import-order
 from shapely import geometry
 
 

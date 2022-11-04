@@ -93,7 +93,7 @@ class Material(abc.ABC):
   @abc.abstractmethod
   def apply_control(
       self,
-      control: simulator_utils.SimulatorControl,
+      control: simulator_utils.BeamControl,
       start_time: dt.timedelta,
       observers: Iterable[simulator_utils.SimulatorObserver] = (),
   ) -> None:
@@ -298,7 +298,7 @@ class PristineSingleDopedGraphene(Material):
 
   def apply_control(
       self,
-      control: simulator_utils.SimulatorControl,
+      control: simulator_utils.BeamControl,
       start_time: dt.timedelta,
       observers: Iterable[simulator_utils.SimulatorObserver] = (),
   ) -> None:

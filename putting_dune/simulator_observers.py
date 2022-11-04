@@ -74,7 +74,7 @@ class EventObserver(simulator_utils.SimulatorObserver):
     self.events.append(event)
 
   def observe_apply_control(
-      self, start_time: dt.timedelta, control: simulator_utils.SimulatorControl
+      self, start_time: dt.timedelta, control: simulator_utils.BeamControl
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.APPLY_CONTROL,

@@ -29,7 +29,7 @@ from putting_dune import simulator_utils
 from shapely import geometry
 
 
-_ARBITRARY_CONTROL = simulator_utils.SimulatorControl(
+_ARBITRARY_CONTROL = simulator_utils.BeamControl(
     geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
 )
 _ARBITRARY_GRID = simulator_utils.AtomicGrid(
@@ -88,7 +88,7 @@ class SimulatorTest(parameterized.TestCase):
     # Mock the material to inspect calls to it.
     sim.material = _get_mock_material(sim.material, sim._fov)
 
-    control = simulator_utils.SimulatorControl(
+    control = simulator_utils.BeamControl(
         control_position, dt.timedelta(seconds=1.5)
     )
     sim.step_and_image([control])
@@ -109,10 +109,10 @@ class SimulatorTest(parameterized.TestCase):
     sim.material = _get_mock_material(sim.material, sim._fov)
 
     controls = [
-        simulator_utils.SimulatorControl(
+        simulator_utils.BeamControl(
             geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
         ),
-        simulator_utils.SimulatorControl(
+        simulator_utils.BeamControl(
             geometry.Point(0.6, 0.8), dt.timedelta(seconds=1.0)
         ),
     ]
@@ -123,7 +123,7 @@ class SimulatorTest(parameterized.TestCase):
   def test_simulator_progresses_time_correctly(self):
     time_per_control = [dt.timedelta(seconds=x) for x in (1.5, 3.0, 7.23)]
     controls = [
-        simulator_utils.SimulatorControl(geometry.Point(0.5, 0.7), x)
+        simulator_utils.BeamControl(geometry.Point(0.5, 0.7), x)
         for x in time_per_control
     ]
     sim = simulator.PuttingDuneSimulator(self._material)
@@ -263,7 +263,7 @@ class SimulatorTest(parameterized.TestCase):
     # Apply a control for 0 seconds to ensure the silicon doesn't move.
     obs = sim.step_and_image(
         [
-            simulator_utils.SimulatorControl(
+            simulator_utils.BeamControl(
                 geometry.Point((1.0, 1.0)), dt.timedelta(seconds=0.0)
             )
         ]

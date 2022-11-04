@@ -98,7 +98,7 @@ class ActionAdaptersTest(parameterized.TestCase):
 
     self.assertLen(simulator_controls, 1)
     self.assertIsInstance(
-        simulator_controls[0], simulator_utils.SimulatorControl
+        simulator_controls[0], simulator_utils.BeamControl
     )
 
   @parameterized.named_parameters(
@@ -143,7 +143,7 @@ class ActionAdaptersTest(parameterized.TestCase):
 
     self.assertLen(simulator_controls, 1)
     self.assertIsInstance(
-        simulator_controls[0], simulator_utils.SimulatorControl
+        simulator_controls[0], simulator_utils.BeamControl
     )
     np.testing.assert_allclose(
         np.asarray(simulator_controls[0].position), expected_position
@@ -169,7 +169,7 @@ class ActionAdaptersTest(parameterized.TestCase):
 
     self.assertLen(simulator_controls, 1)
     self.assertIsInstance(
-        simulator_controls[0], simulator_utils.SimulatorControl
+        simulator_controls[0], simulator_utils.BeamControl
     )
     np.testing.assert_allclose(
         np.asarray(simulator_controls[0].position), delta * grid_scale
@@ -191,7 +191,7 @@ class ActionAdaptersTest(parameterized.TestCase):
 
     self.assertLen(simulator_controls, 1)
     self.assertIsInstance(
-        simulator_controls[0], simulator_utils.SimulatorControl
+        simulator_controls[0], simulator_utils.BeamControl
     )
 
 

@@ -24,7 +24,6 @@ from shapely import geometry
 
 
 
-# TODO(joshgreaves): Add a to_proto and from_proto method.
 @dataclasses.dataclass(frozen=True)
 class AtomicGrid:
   """A grid of atoms."""
@@ -35,9 +34,34 @@ class AtomicGrid:
 
 
 @dataclasses.dataclass(frozen=True)
-class SimulatorControl:
+class BeamControl:
+  """Specifications to control the microscope beam for one step.
+
+  Attributes:
+    position: Point describing the beam position.
+    dwell_time: Beam dwell time.
+  """
+
   position: geometry.Point
   dwell_time: dt.timedelta
+
+
+
+@dataclasses.dataclass(frozen=True)
+class Transition:
+  """Specifications to control the simulator for one step.
+
+  Attributes:
+    grid: Atomic grid representation the observation.
+    shift: Shift applied to the camera position since last step, in angstroms.
+    control: Beam control parameters.
+    fov: Field of view (in angstroms).
+  """
+
+  grid: AtomicGrid
+  shift: geometry.Point
+  control: BeamControl
+
 
 
 @dataclasses.dataclass(frozen=True)
@@ -92,7 +116,7 @@ class SimulatorObserver:
     pass
 
   def observe_apply_control(
-      self, start_time: dt.timedelta, control: SimulatorControl
+      self, start_time: dt.timedelta, control: BeamControl
   ) -> None:
     # end_time can be inferred from start_time and dwell_time.
     pass

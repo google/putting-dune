@@ -87,7 +87,7 @@ class PuttingDuneSimulator:
 
   def step_and_image(
       self,
-      controls: Sequence[simulator_utils.SimulatorControl],
+      controls: Sequence[simulator_utils.BeamControl],
   ) -> simulator_utils.SimulatorObservation:
     """Update simulator state based on beam position delta.
 
@@ -105,7 +105,7 @@ class PuttingDuneSimulator:
       # Convert the control from the microscope frame to material frame.
       # TODO(joshgreaves): Control clipping to [0, 1]?
       control_position = self.convert_point_to_material_frame(control.position)
-      control = simulator_utils.SimulatorControl(
+      control = simulator_utils.BeamControl(
           control_position, control.dwell_time
       )
 

@@ -43,7 +43,7 @@ class ActionAdapter(abc.ABC):
       self,
       grid: simulator_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> List[simulator_utils.SimulatorControl]:
+  ) -> List[simulator_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
 
   @property
@@ -70,7 +70,7 @@ class DeltaPositionActionAdapter(ActionAdapter):
       self,
       grid: simulator_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> List[simulator_utils.SimulatorControl]:
+  ) -> List[simulator_utils.BeamControl]:
     del grid  # Unused.
 
     self.beam_pos += action
@@ -79,7 +79,7 @@ class DeltaPositionActionAdapter(ActionAdapter):
     self.beam_pos = np.clip(self.beam_pos, 0.0, 1.0)
 
     return [
-        simulator_utils.SimulatorControl(
+        simulator_utils.BeamControl(
             geometry.Point(self.beam_pos[0], self.beam_pos[1]),
             # TODO(joshgreaves): Choose/parameterize dwell time.
             dt.timedelta(seconds=1.5),
@@ -104,7 +104,7 @@ class RelativeToSiliconActionAdapter:
       self,
       grid: simulator_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> List[simulator_utils.SimulatorControl]:
+  ) -> List[simulator_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
     silicon_position = graphene.get_silicon_positions(grid)
 
@@ -142,7 +142,7 @@ class RelativeToSiliconActionAdapter:
     control_position = silicon_position + (action * cell_radius)
 
     return [
-        simulator_utils.SimulatorControl(
+        simulator_utils.BeamControl(
             geometry.Point(*control_position), dt.timedelta(seconds=1.5)
         )
     ]

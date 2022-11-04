@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # pyformat: mode=pyink
-"""Code implementing basic KMC contextual rate learning in Haiku."""
+"""Code for managing transition data for rate learning."""
 
 import enum
 import functools
