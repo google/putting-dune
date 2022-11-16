@@ -104,9 +104,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
-    rate_predictor = graphene.simple_transition_rates
+    rate_predictor = graphene.HumanPriorRatePredictor()
     self._material = graphene.PristineSingleDopedGraphene(
-        self._rng, predict_rates=rate_predictor
+        self._rng, predict_rates=rate_predictor.predict
     )
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.

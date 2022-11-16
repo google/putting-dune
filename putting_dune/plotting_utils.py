@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from matplotlib import animation
 from matplotlib import pyplot as plt
 import numpy as np
-from putting_dune import graphene
+from putting_dune import constants
 from putting_dune import simulator_observers
 from putting_dune import simulator_utils
 
@@ -49,8 +49,8 @@ def _plot(
     control_size: float = 10.0,
 ) -> None:
   """Utility function for common plotting."""
-  carbon_atoms = grid.atom_positions[grid.atomic_numbers == graphene.CARBON]
-  silicon_atoms = grid.atom_positions[grid.atomic_numbers == graphene.SILICON]
+  carbon_atoms = grid.atom_positions[grid.atomic_numbers == constants.CARBON]
+  silicon_atoms = grid.atom_positions[grid.atomic_numbers == constants.SILICON]
 
   # Plot the carbon atoms.
   ax.plot(

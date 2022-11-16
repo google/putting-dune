@@ -19,6 +19,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from putting_dune import action_adapters
+from putting_dune import constants
 from putting_dune import graphene
 from putting_dune import simulator_utils
 
@@ -31,7 +32,7 @@ def _make_unit_hexagonal_grid(
 ) -> simulator_utils.AtomicGrid:
   material = graphene.PristineSingleDopedGraphene(rng)
   atom_positions = (
-      material.atom_positions / graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+      material.atom_positions / constants.CARBON_BOND_DISTANCE_ANGSTROMS
   )
   return simulator_utils.AtomicGrid(atom_positions, material.atomic_numbers)
 
@@ -97,9 +98,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(
-        simulator_controls[0], simulator_utils.BeamControl
-    )
+    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
 
   @parameterized.named_parameters(
       dict(
@@ -130,7 +129,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     grid = _make_unit_hexagonal_grid(np.random.default_rng(0))
     # Shift the whole grid so the silicon is in the specified position.
     current_silicon_position = grid.atom_positions[
-        grid.atomic_numbers == graphene.SILICON
+        grid.atomic_numbers == constants.SILICON
     ]
     grid.atom_positions[:, :] += silicon_position - current_silicon_position
 
@@ -142,9 +141,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(
-        simulator_controls[0], simulator_utils.BeamControl
-    )
+    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
     np.testing.assert_allclose(
         np.asarray(simulator_controls[0].position), expected_position
     )
@@ -157,7 +154,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     grid = _make_unit_hexagonal_grid(np.random.default_rng(0))
     # Shift the whole grid so the silicon is at the origin.
     current_silicon_position = grid.atom_positions[
-        grid.atomic_numbers == graphene.SILICON
+        grid.atomic_numbers == constants.SILICON
     ]
     grid.atom_positions[:, :] -= current_silicon_position
     grid.atom_positions[:, :] *= grid_scale  # Scale the grid as specified.
@@ -168,9 +165,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     simulator_controls = action_adapter.get_action(grid, delta)
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(
-        simulator_controls[0], simulator_utils.BeamControl
-    )
+    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
     np.testing.assert_allclose(
         np.asarray(simulator_controls[0].position), delta * grid_scale
     )
@@ -190,9 +185,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(
-        simulator_controls[0], simulator_utils.BeamControl
-    )
+    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
 
 
 if __name__ == '__main__':

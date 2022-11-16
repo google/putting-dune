@@ -19,6 +19,7 @@ import abc
 import dataclasses
 
 import numpy as np
+from putting_dune import constants
 from putting_dune import graphene
 from putting_dune import simulator_utils
 from sklearn import neighbors
@@ -119,7 +120,7 @@ class SingleSiliconGoalReaching(Goal):
     )
 
     # Update whether the silicon is near the goal.
-    goal_radius = graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
+    goal_radius = constants.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
     goal_distance = np.linalg.norm(
         silicon_position_material_frame - self.goal_position_material_frame
     )
@@ -149,7 +150,7 @@ class SingleSiliconGoalReaching(Goal):
     # Since the neighbors are sorted, just look at the furthest neighbor.
     is_truncation = (
         si_neighbor_distances[0, -1]
-        > graphene.CARBON_BOND_DISTANCE_ANGSTROMS * 1.1
+        > constants.CARBON_BOND_DISTANCE_ANGSTROMS * 1.1
     )
 
     return GoalReturn(-cost, is_terminal, is_truncation)

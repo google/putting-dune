@@ -19,6 +19,7 @@ from unittest import mock
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import constants
 from putting_dune import goals
 from putting_dune import graphene
 from putting_dune import simulator
@@ -59,7 +60,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
       )
       self.assertLessEqual(
           neighbor_distances[0, -1],
-          graphene.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
+          constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
       )
 
   def test_reward_increases_when_silicon_is_nearer_goal(self):
@@ -97,8 +98,8 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     # center, which is guaranteed to be a edge (a corner, specifically).
     atom_distances = np.linalg.norm(self.material.atom_positions, axis=1)
     furthest_idx = np.argmax(atom_distances)
-    self.material.atomic_numbers[:] = graphene.CARBON
-    self.material.atomic_numbers[furthest_idx] = graphene.SILICON
+    self.material.atomic_numbers[:] = constants.CARBON
+    self.material.atomic_numbers[furthest_idx] = constants.SILICON
 
     result = self.goal.caluclate_reward_and_terminal(obs)
 

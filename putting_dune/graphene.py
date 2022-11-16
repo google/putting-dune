@@ -20,15 +20,11 @@ import datetime as dt
 from typing import Callable, Iterable, Tuple
 
 import numpy as np
+from putting_dune import constants
+from putting_dune import data_utils
 from putting_dune import simulator_utils
 from shapely import geometry
 from sklearn import neighbors
-
-
-CARBON = 6
-SILICON = 14
-
-CARBON_BOND_DISTANCE_ANGSTROMS = 1.42
 
 
 def simple_transition_rates(
@@ -58,12 +54,73 @@ def simple_transition_rates(
   # Distance between neighbors and beam position.
   dist = np.linalg.norm(beam_pos - neighbor_positions, axis=-1)
   # Normalize by carbon bond distance.
-  dist = dist / CARBON_BOND_DISTANCE_ANGSTROMS
+  dist = dist / constants.CARBON_BOND_DISTANCE_ANGSTROMS
   # Inverse square falloff for beam displacement.
   rates = 1.0 / (np.square(dist) + 0.5)  # Maximum rate = 2.
 
   # Rates for moving to the nearest neighbor positions.
   return rates
+
+
+class HumanPriorRatePredictor:
+  """Implements rate prediction according to a human-designed prior.
+
+  Attributes:
+    mean: Point for which transition is most likely, relative to a neighbor
+      located at (1, 0).
+    cov: Assuming Gaussian falloff of transition rates, the covariance matrix
+      describing the shape of the distribution.
+    max_rate: The maximum rate (as lambda of an exponential distribution) at the
+      center of the peak.
+  """
+
+  def __init__(
+      self,
+      mean: np.ndarray = constants.SIGR_PRIOR_RATE_MEAN,
+      cov: np.ndarray = constants.SIGR_PRIOR_RATE_COV,
+      max_rate: float = constants.SIGR_PRIOR_MAX_RATE,
+  ):
+    self.mean = mean
+    self.cov = cov
+    self.max_rate = max_rate
+
+  def predict(
+      self,
+      grid: simulator_utils.AtomicGrid,
+      beam_pos: geometry.Point,
+      current_position: np.ndarray,
+      neighbor_indices: np.ndarray,
+  ) -> np.ndarray:
+    """Computes rate constants for transitioning a Si atom.
+
+    Args:
+      grid: Atomic grid state.
+      beam_pos: 2-dimensional beam position in material coordinate frame.
+      current_position: 2-dimensional position of the current silicon atom.
+      neighbor_indices: Indices of the atoms on the grid to calculate rates for.
+
+    Returns:
+      a 3-dimensional array of rate constants for transitioning to the 3
+        nearest neighbors.
+    """
+    # Convert the beam_pos into a numpy array for convenience
+    beam_pos = np.asarray([[beam_pos.x, beam_pos.y]])  # Shape = [1, -1]
+
+    neighbor_positions = grid.atom_positions[neighbor_indices, :]
+    relative_neighbor_positions = neighbor_positions - current_position
+    angles = data_utils.get_neighbor_angles(relative_neighbor_positions)
+
+    relative_beam_position = beam_pos - current_position
+    relative_beam_position /= constants.CARBON_BOND_DISTANCE_ANGSTROMS
+    rates = np.zeros((neighbor_indices.shape), dtype=float)
+    for i, angle in enumerate(angles):
+      rotated_mean = data_utils.rotate_coordinates(self.mean, -angle)
+      rate = data_utils.prior_rates(
+          relative_beam_position, rotated_mean, self.cov, self.max_rate
+      )
+      rates[i] = rate
+
+    return rates
 
 
 # TODO(joshgreaves): Move interface if we support more than graphene.
@@ -172,7 +229,9 @@ def sample_point_away_from_edge(
   # all the points, and then pick from the contracted points, and finally
   # pick the closest original point to the selected contracted point.
   max_atom_l2_distance = np.max(np.linalg.norm(atom_positions, axis=1, ord=2))
-  border_length = border_atom_positions * CARBON_BOND_DISTANCE_ANGSTROMS
+  border_length = (
+      border_atom_positions * constants.CARBON_BOND_DISTANCE_ANGSTROMS
+  )
   contraction = 1 - border_length / max_atom_l2_distance
   # Some very small grids might have a negative contraction, so clip it.
   contraction = max(contraction, 0.1)
@@ -229,7 +288,7 @@ class PristineSingleDopedGraphene(Material):
     grid = _generate_hexagonal_grid(self._grid_columns)
 
     # Scale the grid to have the correct cell distance.
-    grid = grid * CARBON_BOND_DISTANCE_ANGSTROMS
+    grid = grid * constants.CARBON_BOND_DISTANCE_ANGSTROMS
 
     # Center the grid.
     # TODO(joshgreaves): Maybe add a small randomly generated offset.
@@ -251,12 +310,12 @@ class PristineSingleDopedGraphene(Material):
     ).fit(self.atom_positions)
 
     num_atoms = self.atom_positions.shape[0]
-    self.atomic_numbers = np.full(num_atoms, CARBON)
+    self.atomic_numbers = np.full(num_atoms, constants.CARBON)
 
     _, si_index = sample_point_away_from_edge(
         self.rng, self.atom_positions, self.nearest_neighbors
     )
-    self.atomic_numbers[si_index] = SILICON
+    self.atomic_numbers[si_index] = constants.SILICON
 
   def get_atoms_in_bounds(
       self, lower_left: geometry.Point, upper_right: geometry.Point
@@ -345,8 +404,10 @@ class PristineSingleDopedGraphene(Material):
 
         # Pick index to transition to.
         si_atom_index = self.rng.choice(si_neighbors_index, p=neighbors_prob)
-        self.atomic_numbers[self.atomic_numbers == SILICON] = CARBON
-        self.atomic_numbers[si_atom_index] = SILICON
+        self.atomic_numbers[
+            self.atomic_numbers == constants.SILICON
+        ] = constants.CARBON
+        self.atomic_numbers[si_atom_index] = constants.SILICON
 
         for observer in observers:
           observer.observe_transition(
@@ -361,8 +422,10 @@ class PristineSingleDopedGraphene(Material):
     )
 
   def get_silicon_position(self) -> np.ndarray:
-    return self.atom_positions[self.atomic_numbers == SILICON].reshape(-1)
+    return self.atom_positions[
+        self.atomic_numbers == constants.SILICON
+    ].reshape(-1)
 
 
 def get_silicon_positions(grid: simulator_utils.AtomicGrid) -> np.ndarray:
-  return grid.atom_positions[grid.atomic_numbers == SILICON]
+  return grid.atom_positions[grid.atomic_numbers == constants.SILICON]

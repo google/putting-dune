@@ -20,6 +20,7 @@ from unittest import mock
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import constants
 from putting_dune import graphene
 from putting_dune import simulator_utils
 from shapely import geometry
@@ -49,13 +50,13 @@ class GrapheneTest(absltest.TestCase):
 
     self.assertEqual(neighbor_distances[0], 0.0)  # Self-distance.
     self.assertAlmostEqual(
-        neighbor_distances[1], graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+        neighbor_distances[1], constants.CARBON_BOND_DISTANCE_ANGSTROMS
     )
     self.assertAlmostEqual(
-        neighbor_distances[2], graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+        neighbor_distances[2], constants.CARBON_BOND_DISTANCE_ANGSTROMS
     )
     self.assertAlmostEqual(
-        neighbor_distances[3], graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+        neighbor_distances[3], constants.CARBON_BOND_DISTANCE_ANGSTROMS
     )
 
   def test_different_seeds_give_different_orientations_of_graphene(self):
@@ -105,7 +106,7 @@ class GrapheneTest(absltest.TestCase):
   def test_graphene_only_contains_a_single_dopant(self):
     material = graphene.PristineSingleDopedGraphene(self.rng)
 
-    num_silicon = np.sum(material.atomic_numbers == graphene.SILICON)
+    num_silicon = np.sum(material.atomic_numbers == constants.SILICON)
     self.assertEqual(num_silicon, 1)
 
   def test_get_atoms_in_bounds_gets_correct_atoms(self):
@@ -113,8 +114,8 @@ class GrapheneTest(absltest.TestCase):
 
     lower_left = geometry.Point((0.0, 0.0))
     upper_right = geometry.Point((
-        2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
-        2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+        2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
     ))
     grid = material.get_atoms_in_bounds(lower_left, upper_right)
 
@@ -127,12 +128,12 @@ class GrapheneTest(absltest.TestCase):
       self.assertBetween(
           atom_position[0],  # Check x is in bounds.
           0.0,
-          2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+          2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
       )
       self.assertBetween(
           atom_position[1],  # Check y is in bounds.
           0.0,
-          2 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+          2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
       )
 
   def test_get_atoms_in_bounds_correctly_normalizes_points_in_unit_square(self):
@@ -140,8 +141,8 @@ class GrapheneTest(absltest.TestCase):
 
     lower_left = geometry.Point((-10.0, -10.0))
     upper_right = geometry.Point((
-        -10.0 + 5 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
-        -10.0 + 5 * graphene.CARBON_BOND_DISTANCE_ANGSTROMS,
+        -10.0 + 5 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        -10.0 + 5 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
     ))
     grid = material.get_atoms_in_bounds(lower_left, upper_right)
 
@@ -171,7 +172,7 @@ class GrapheneTest(absltest.TestCase):
     np.testing.assert_array_equal(atom_positions_before, atom_positions_after)
     self.assertTrue((atomic_numbers_before != atomic_numbers_after).any())
 
-    num_silicon = np.sum(material.atomic_numbers == graphene.SILICON)
+    num_silicon = np.sum(material.atomic_numbers == constants.SILICON)
     self.assertEqual(num_silicon, 1)
 
   @mock.patch.object(
@@ -238,8 +239,17 @@ class GrapheneTest(absltest.TestCase):
       )
       self.assertLessEqual(
           neighbor_distances[0, -1],
-          graphene.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
+          constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
       )
+
+  def test_human_prior_rates(self):
+    rng = np.random.default_rng(0)
+    transition_model = graphene.HumanPriorRatePredictor()
+    material = graphene.PristineSingleDopedGraphene(
+        rng, predict_rates=transition_model.predict
+    )
+
+    material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
 
 
 if __name__ == '__main__':

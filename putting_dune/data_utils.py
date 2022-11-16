@@ -23,13 +23,8 @@ from typing import Mapping, Optional, Tuple
 import jax
 from jax import numpy as jnp
 import numpy as np
+from putting_dune import constants
 from putting_dune import rate_learning
-
-
-# TODO(joshgreaves): Avoid duplicating these values.
-PRIOR_RATE_MEAN = np.array((0.85, 0))
-PRIOR_RATE_COV = np.array(((0.1, 0), (0, 0.1)))
-PRIOR_MAX_RATE = np.log(2) / 3
 
 
 class SyntheticDataType(str, enum.Enum):
@@ -249,13 +244,15 @@ def generate_synthetic_data(
         context_key,
     ) = jax.random.split(key, 5)
     context = sample_multivariate_context(
-        context_key, PRIOR_RATE_MEAN, PRIOR_RATE_COV * 1.5
+        context_key,
+        constants.SIGR_PRIOR_RATE_MEAN,
+        constants.SIGR_PRIOR_RATE_COV * 1.5,
     )
     rates = prior_rates(
         get_all_context_rotations(context, num_states=num_states),
-        mean=PRIOR_RATE_MEAN,
-        cov=PRIOR_RATE_COV,
-        max_rate=PRIOR_MAX_RATE,
+        mean=constants.SIGR_PRIOR_RATE_MEAN,
+        cov=constants.SIGR_PRIOR_RATE_COV,
+        max_rate=constants.SIGR_PRIOR_MAX_RATE,
     )
     total_rate = jnp.sum(rates, -1)
     p = rates / total_rate
@@ -326,10 +323,11 @@ def bootstrap_dataset(data: Mapping[str, np.ndarray], rng: jnp.ndarray):
   return train_data, test_data
 
 
-def split_dataset(data: Mapping[str, np.ndarray],
-                  rng: jnp.ndarray,
-                  test_fraction: float = 0.1,
-                  ) -> Tuple[Mapping[str, np.ndarray], ...]:
+def split_dataset(
+    data: Mapping[str, np.ndarray],
+    rng: jnp.ndarray,
+    test_fraction: float = 0.1,
+) -> Tuple[Mapping[str, np.ndarray], ...]:
   """Splits a dataset to generate a training and testing dataset.
 
   Args:
@@ -343,12 +341,10 @@ def split_dataset(data: Mapping[str, np.ndarray],
   """
   original_length = list(data.values())[0].shape[0]
   indices = jax.random.choice(
-      rng,
-      a=original_length,
-      shape=[original_length],
-      replace=False)
-  train_indices = indices[int(original_length*test_fraction):]
-  test_indices = indices[:int(original_length*test_fraction)]
+      rng, a=original_length, shape=[original_length], replace=False
+  )
+  train_indices = indices[int(original_length * test_fraction) :]
+  test_indices = indices[: int(original_length * test_fraction)]
   train_data = {k: a[train_indices] for k, a in data.items()}
   test_data = {k: a[test_indices] for k, a in data.items()}
   return train_data, test_data

@@ -15,7 +15,6 @@
 # pyformat: mode=pyink
 """Tests for rate learning."""
 
-import time
 from typing import Tuple
 
 from absl.testing import absltest
@@ -155,7 +154,7 @@ class RatePredictorTest(parameterized.TestCase):
         mode=mode,
     )
 
-    key = jax.random.PRNGKey(int(time.time()))
+    key = jax.random.PRNGKey(0)
     learner = rate_learning.LearnedTransitionRatePredictor(init_key=key,)
 
     learner.train(train_data, key)

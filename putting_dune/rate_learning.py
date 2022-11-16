@@ -29,8 +29,8 @@ from jax import numpy as jnp
 from ml_collections import config_dict
 import numpy as np
 import optax
+from putting_dune import constants
 from putting_dune import data_utils
-from putting_dune import graphene
 from putting_dune import simulator_utils
 from shapely import geometry
 
@@ -510,7 +510,7 @@ class LearnedTransitionRatePredictor:
     neighbor_positions = grid.atom_positions[neighbor_indices, :]
     neighbor_positions = neighbor_positions - current_position
     beam_pos = beam_pos - current_position
-    beam_pos = beam_pos / graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+    beam_pos = beam_pos / constants.CARBON_BOND_DISTANCE_ANGSTROMS
     new_beam_pos, neighbor_order, _ = data_utils.standardize_beam_and_neighbors(
         beam_pos,
         neighbor_positions,

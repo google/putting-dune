@@ -20,8 +20,8 @@ from typing import Optional
 
 import networkx as nx
 import numpy as np
+from putting_dune import constants
 from putting_dune import data_utils
-from putting_dune import graphene
 import scipy.spatial
 import scipy.stats
 from sklearn import cluster
@@ -44,7 +44,7 @@ def get_graphene_scale_factor(coordinates: np.ndarray) -> float:
       0.25,
   )
 
-  return estimated_scale / graphene.CARBON_BOND_DISTANCE_ANGSTROMS
+  return estimated_scale / constants.CARBON_BOND_DISTANCE_ANGSTROMS
 
 
 def get_offsets(
