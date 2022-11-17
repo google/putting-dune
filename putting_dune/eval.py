@@ -13,7 +13,9 @@
 # limitations under the License.
 
 # pyformat: mode=pyink
-"""Entry point for standalone evaluation."""
+r"""Entry point for standalone evaluation.
+
+"""
 
 import dataclasses
 from typing import Optional
@@ -21,8 +23,8 @@ from typing import Optional
 from absl import app
 from etils import eapp
 import numpy as np
-from putting_dune import agent_lib
 from putting_dune import eval_lib
+from putting_dune import experiment_registry
 from putting_dune import run_helpers
 
 
@@ -30,31 +32,22 @@ from putting_dune import run_helpers
 class Args:
   """Command line arguments."""
 
+  experiment_name: str
   video_save_dir: Optional[str] = None
 
 
 def main(args: Args) -> None:
+  # TODO(joshgreaves): Pass seed in for agent.
+  rng = np.random.default_rng(0)
+  experiment = experiment_registry.create_experiment(args.experiment_name, rng)
+  agent = experiment.agent
+
   # Set up the environment.
   # Note: We pass in an arbitrary seed here, since evaluate will
   # pass in a specific seed for each episode.
+  # TODO(joshgreaves): Pass the relative objects from the experiment into
+  # the environment.
   env = run_helpers.create_putting_dune_env(seed=0)
-
-  # Set up the agent.
-  # TODO(joshgreaves): Pass seed in for agent.
-  rng = np.random.default_rng(0)
-
-  # For now we assume that the action_spec min and max are floats.
-  # However, this may change.
-  action_spec = env.action_spec()
-  # These are actually np arrays with a single value, so unpack the float.
-  action_minimum = action_spec.minimum.item()
-  action_maximum = action_spec.maximum.item()
-  assert isinstance(action_minimum, float)
-  assert isinstance(action_maximum, float)
-
-  agent = agent_lib.UniformRandomAgent(
-      rng, action_minimum, action_maximum, action_spec.shape
-  )
 
   # Set up the eval suite.
   # TODO(joshgreaves): Specify specific eval suites.

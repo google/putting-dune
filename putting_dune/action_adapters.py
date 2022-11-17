@@ -94,7 +94,7 @@ class DeltaPositionActionAdapter(ActionAdapter):
     )
 
 
-class RelativeToSiliconActionAdapter:
+class RelativeToSiliconActionAdapter(ActionAdapter):
   """An action adapter that accepts a relative position to a silicon atom."""
 
   def reset(self):

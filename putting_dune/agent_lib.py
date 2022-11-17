@@ -18,7 +18,7 @@
 import abc
 import enum
 import functools
-from typing import Sequence
+from typing import Sequence, Union
 
 import dm_env
 import numpy as np
@@ -58,8 +58,8 @@ class UniformRandomAgent(Agent):
   def __init__(
       self,
       rng: np.random.Generator,
-      low: float,
-      high: float,
+      low: Union[float, np.ndarray],
+      high: Union[float, np.ndarray],
       size: Sequence[int],
   ):
     """UniformRandomAgent constructor.
