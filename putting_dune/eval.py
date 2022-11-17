@@ -21,6 +21,7 @@ import dataclasses
 from typing import Optional
 
 from absl import app
+from absl import logging
 from etils import eapp
 import numpy as np
 from putting_dune import eval_lib
@@ -33,6 +34,7 @@ class Args:
   """Command line arguments."""
 
   experiment_name: str
+  eval_suite: str
   video_save_dir: Optional[str] = None
 
 
@@ -50,10 +52,28 @@ def main(args: Args) -> None:
   env = run_helpers.create_putting_dune_env(seed=0)
 
   # Set up the eval suite.
-  # TODO(joshgreaves): Specify specific eval suites.
-  eval_suite = eval_lib.EvalSuite(tuple(range(10)))
+  eval_suite = eval_lib.EVAL_SUITES[args.eval_suite]
 
-  eval_lib.evaluate(agent, env, eval_suite, video_save_dir=args.video_save_dir)
+  eval_results = eval_lib.evaluate(
+      agent, env, eval_suite, video_save_dir=args.video_save_dir
+  )
+
+  aggregate_results = eval_lib.aggregate_results(eval_results)
+  logging.info('Finished evaluation for experiment %s', args.experiment_name)
+  logging.info(
+      'Proportion successful runs: %.2f',
+      aggregate_results.average_num_times_reached_goal,
+  )
+  logging.info(
+      'Average number of actions taken: %.2f',
+      aggregate_results.average_num_actions_taken,
+  )
+  logging.info(
+      'Average seconds to goal: %.2f', aggregate_results.average_seconds_to_goal
+  )
+  logging.info(
+      'Average total reward: %.2f', aggregate_results.average_total_reward
+  )
 
 
 if __name__ == '__main__':

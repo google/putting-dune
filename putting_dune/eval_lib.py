@@ -17,10 +17,11 @@
 
 import dataclasses
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from absl import logging
 import dm_env
+import frozendict
 from putting_dune import agent_lib
 from putting_dune import plotting_utils
 from putting_dune import putting_dune_environment
@@ -32,6 +33,14 @@ class EvalSuite:
   seeds: Tuple[int, ...]
 
 
+EVAL_SUITES = frozendict.frozendict({
+    'tiny_eval': EvalSuite(tuple(range(10))),
+    'small_eval': EvalSuite(tuple(range(100))),
+    'medium_eval': EvalSuite(tuple(range(1_000))),
+    'big_eval': EvalSuite(tuple(range(10_000))),
+})
+
+
 @dataclasses.dataclass
 class EvalResult:
   seed: int
@@ -39,6 +48,14 @@ class EvalResult:
   num_actions_taken: int
   seconds_to_goal: float
   total_reward: float
+
+
+@dataclasses.dataclass
+class AggregateEvalResults:
+  average_num_times_reached_goal: float
+  average_num_actions_taken: float
+  average_seconds_to_goal: float
+  average_total_reward: float
 
 
 def evaluate(
@@ -116,3 +133,28 @@ def evaluate(
     env.sim.remove_observer(observer)
 
   return results
+
+
+def aggregate_results(results: Sequence[EvalResult]) -> AggregateEvalResults:
+  """Aggregates a sequence of eval results."""
+  num_times_reached_goal = 0
+  num_actions_taken = 0
+  seconds_to_goal = 0.0
+  total_reward = 0.0
+
+  for result in results:
+    num_times_reached_goal += int(result.reached_goal)
+
+    if result.reached_goal:
+      num_actions_taken += result.num_actions_taken
+      seconds_to_goal += result.seconds_to_goal
+      total_reward += result.total_reward
+
+  denominator = max(num_times_reached_goal, 1)
+
+  return AggregateEvalResults(
+      average_num_times_reached_goal=num_times_reached_goal / len(results),
+      average_num_actions_taken=num_actions_taken / denominator,
+      average_seconds_to_goal=seconds_to_goal / denominator,
+      average_total_reward=total_reward / denominator,
+  )

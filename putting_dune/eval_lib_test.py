@@ -84,6 +84,40 @@ class EvalLibTest(absltest.TestCase):
     self.assertLen(files, 1)  # There should be one file saved.
     self.assertEqual(files[0], '0.gif')
 
+  def test_aggregate_results_correctly_computes_values(self):
+    results = [
+        eval_lib.EvalResult(
+            seed=0,
+            reached_goal=True,
+            num_actions_taken=10,
+            seconds_to_goal=5.0,
+            total_reward=50.0,
+        ),
+        eval_lib.EvalResult(
+            seed=1,
+            reached_goal=True,
+            num_actions_taken=13,
+            seconds_to_goal=6.5,
+            total_reward=35.0,
+        ),
+        eval_lib.EvalResult(
+            seed=2,
+            reached_goal=False,
+            num_actions_taken=100,
+            seconds_to_goal=500.0,
+            total_reward=0.0,
+        ),
+    ]
+
+    aggregate_results = eval_lib.aggregate_results(results)
+
+    self.assertAlmostEqual(
+        aggregate_results.average_num_times_reached_goal, 2 / 3
+    )
+    self.assertAlmostEqual(aggregate_results.average_num_actions_taken, 11.5)
+    self.assertAlmostEqual(aggregate_results.average_seconds_to_goal, 5.75)
+    self.assertAlmostEqual(aggregate_results.average_total_reward, 42.5)
+
 
 if __name__ == '__main__':
   absltest.main()

@@ -16,7 +16,7 @@
 """A collection of experiments."""
 
 import dataclasses
-from typing import Callable
+from typing import Callable, Optional
 
 import frozendict
 import numpy as np
