@@ -44,7 +44,7 @@ class Goal(abc.ABC):
     """Resets and picks a new goal."""
 
   @abc.abstractmethod
-  def caluclate_reward_and_terminal(
+  def calculate_reward_and_terminal(
       self,
       observation: simulator_utils.SimulatorObservation,
   ) -> GoalReturn:
@@ -85,7 +85,7 @@ class SingleSiliconGoalReaching(Goal):
     )
     self._consecutive_goal_steps = 0
 
-  def caluclate_reward_and_terminal(
+  def calculate_reward_and_terminal(
       self,
       observation: simulator_utils.SimulatorObservation,
   ) -> GoalReturn:

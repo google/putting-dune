@@ -22,8 +22,8 @@ import frozendict
 import numpy as np
 from putting_dune import action_adapters
 from putting_dune import agent_lib
+from putting_dune import feature_constructors
 from putting_dune import goals
-from putting_dune import putting_dune_environment
 
 
 
@@ -31,8 +31,7 @@ from putting_dune import putting_dune_environment
 class Experiment:
   agent: agent_lib.Agent
   action_adapter: action_adapters.ActionAdapter
-  # TODO(joshgreaves): Use abstract base class as the type hint.
-  feature_constructor: putting_dune_environment.SingleSiliconPristineGraphineFeatureConstuctor
+  feature_constructor: feature_constructors.FeatureConstructor
   goal: goals.Goal
 
 
@@ -47,7 +46,7 @@ def _random_experiment(rng: np.random.Generator) -> Experiment:
           action_adapter.action_spec.shape,
       ),
       action_adapter=action_adapter,
-      feature_constructor=putting_dune_environment.SingleSiliconPristineGraphineFeatureConstuctor(),
+      feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
       goal=goals.SingleSiliconGoalReaching(),
   )
 

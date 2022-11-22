@@ -73,9 +73,9 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     further_goal = silicon_position + np.asarray([-8.0, 5.0], dtype=np.float32)
 
     self.goal.goal_position_material_frame = closer_goal
-    closer_result = self.goal.caluclate_reward_and_terminal(obs)
+    closer_result = self.goal.calculate_reward_and_terminal(obs)
     self.goal.goal_position_material_frame = further_goal
-    further_result = self.goal.caluclate_reward_and_terminal(obs)
+    further_result = self.goal.calculate_reward_and_terminal(obs)
 
     self.assertGreater(closer_result.reward, further_result.reward)
 
@@ -86,7 +86,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
         return_value=self.goal.goal_position_material_frame
     )
 
-    result = self.goal.caluclate_reward_and_terminal(obs)
+    result = self.goal.calculate_reward_and_terminal(obs)
 
     self.assertTrue(result.is_terminal)
 
@@ -101,6 +101,6 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     self.material.atomic_numbers[:] = constants.CARBON
     self.material.atomic_numbers[furthest_idx] = constants.SILICON
 
-    result = self.goal.caluclate_reward_and_terminal(obs)
+    result = self.goal.calculate_reward_and_terminal(obs)
 
     self.assertTrue(result.is_truncated)

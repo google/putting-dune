@@ -106,7 +106,7 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
   def test_environment_obeys_reset_semantics_after_last_step(self):
     env = putting_dune_environment.PuttingDuneEnvironment()
-    env.goal.caluclate_reward_and_terminal = mock.MagicMock(
+    env.goal.calculate_reward_and_terminal = mock.MagicMock(
         return_value=goals.GoalReturn(
             reward=0.0, is_terminal=True, is_truncated=False
         )
@@ -124,7 +124,7 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
   def test_environment_truncates_correctly(self):
     env = putting_dune_environment.PuttingDuneEnvironment()
-    env.goal.caluclate_reward_and_terminal = mock.MagicMock(
+    env.goal.calculate_reward_and_terminal = mock.MagicMock(
         return_value=goals.GoalReturn(
             reward=0.0, is_terminal=False, is_truncated=True
         )
@@ -135,8 +135,6 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
     self.assertEqual(step.step_type, dm_env.StepType.LAST)
     self.assertGreater(step.discount, 0.0)
-
-  # TODO(joshgreaves): Write tests for feature constructor.
 
 
 if __name__ == '__main__':

@@ -24,77 +24,18 @@ from dm_env import specs
 import matplotlib.pyplot as plt
 import numpy as np
 from putting_dune import action_adapters
+from putting_dune import feature_constructors
 from putting_dune import goals
 from putting_dune import graphene
 from putting_dune import plotting_utils
 from putting_dune import simulator
 from putting_dune import simulator_utils
 from shapely import geometry
-from sklearn import neighbors
 
 
 class RatePredictorType(str, enum.Enum):
   PRIOR = 'prior'
   SIMPLE = 'simple'
-
-
-class SingleSiliconPristineGraphineFeatureConstuctor:
-  """A feature constructor assuming pristine graphene with single dopant."""
-
-  def reset(self) -> None:
-    # We include this because other feature constructors may be stateful.
-    # However, this one isn't.
-    pass
-
-  def get_features(
-      self,
-      observation: simulator_utils.SimulatorObservation,
-      goal: goals.SingleSiliconGoalReaching,
-  ) -> np.ndarray:
-    """Gets features for an agent based on the osbervation and goal."""
-    silicon_position = graphene.get_silicon_positions(observation.grid).reshape(
-        2
-    )
-
-    # Get the vectors to the nearest neighbors.
-    nearest_neighbors = neighbors.NearestNeighbors(
-        n_neighbors=1 + 3,
-        metric='l2',
-        algorithm='brute',
-    ).fit(observation.grid.atom_positions)
-    neighbor_distances, neighbor_indices = nearest_neighbors.kneighbors(
-        silicon_position.reshape(1, 2)
-    )
-    neighbor_positions = observation.grid.atom_positions[
-        neighbor_indices[0, 1:]
-    ]
-    neighbor_deltas = neighbor_positions - silicon_position.reshape(1, 2)
-    neighbor_distances = neighbor_distances[0, 1:].reshape(-1, 1)
-    normalized_deltas = neighbor_deltas / neighbor_distances
-
-    material_frame_grid = observation.fov.microscope_grid_to_material_grid(
-        observation.grid
-    )
-    silicon_position_material_frame = graphene.get_silicon_positions(
-        material_frame_grid
-    ).reshape(2)
-    goal_delta_material_frame = (
-        goal.goal_position_material_frame - silicon_position_material_frame
-    )
-
-    obs = np.concatenate([
-        silicon_position,
-        normalized_deltas.reshape(-1),
-        goal_delta_material_frame,
-    ])
-
-    return obs.astype(np.float32)
-
-  def observation_spec(self) -> specs.Array:
-    # 2 for silicon position.
-    # 6 for 3 nearest neighbor delta vectors.
-    # 2 for goal delta.
-    return specs.Array((2 + 6 + 2,), np.float32)
 
 
 class PuttingDuneEnvironment(dm_env.Environment):
@@ -111,7 +52,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapters.RelativeToSiliconActionAdapter()
-    self._feature_constructor = SingleSiliconPristineGraphineFeatureConstuctor()
+    self._feature_constructor = (
+        feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor()
+    )
     self.goal = goals.SingleSiliconGoalReaching()
 
     # Variables that will be set on reset.
@@ -184,7 +127,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     # 4. Calculate the reward (and terminal?) using RewardFunction.
     # Perhaps never terminate to teach the agent to keep the silicon at goal?
-    goal_return = self.goal.caluclate_reward_and_terminal(
+    goal_return = self.goal.calculate_reward_and_terminal(
         self._last_simulator_observation
     )
 
