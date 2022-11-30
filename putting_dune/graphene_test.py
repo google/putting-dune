@@ -22,10 +22,10 @@ from absl.testing import absltest
 import numpy as np
 from putting_dune import constants
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from shapely import geometry
 
-_ARBITRARY_CONTROL = simulator_utils.BeamControl(
+_ARBITRARY_CONTROL = microscope_utils.BeamControl(
     geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
 )
 _ARBITRARY_TIME = dt.timedelta(seconds=1.0)

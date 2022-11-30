@@ -31,7 +31,7 @@ import numpy as np
 import optax
 from putting_dune import constants
 from putting_dune import data_utils
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from shapely import geometry
 
 
@@ -485,7 +485,7 @@ class LearnedTransitionRatePredictor:
 
   def predict(
       self,
-      grid: simulator_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGrid,
       beam_pos: geometry.Point,
       current_position: np.ndarray,
       neighbor_indices: np.ndarray,

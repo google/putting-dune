@@ -19,8 +19,8 @@ import datetime as dt
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import microscope_utils
 from putting_dune import simulator_observers
-from putting_dune import simulator_utils
 from shapely import geometry
 
 
@@ -29,14 +29,14 @@ class SimulatorObserversTest(absltest.TestCase):
   def test_event_observer_tracks_events_correctly(self):
     observer = simulator_observers.EventObserver()
 
-    grid = simulator_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
-    fov = simulator_utils.SimulatorFieldOfView(
+    grid = microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    fov = microscope_utils.MicroscopeFieldOfView(
         geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
     )
     observer.observe_reset(grid, fov)
     observer.observe_apply_control(
         dt.timedelta(seconds=1.0),
-        simulator_utils.BeamControl(
+        microscope_utils.BeamControl(
             geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)
         ),
     )
@@ -67,8 +67,8 @@ class SimulatorObserversTest(absltest.TestCase):
 
   def test_event_observer_reset_resets_events(self):
     observer = simulator_observers.EventObserver()
-    grid = simulator_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
-    fov = simulator_utils.SimulatorFieldOfView(
+    grid = microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    fov = microscope_utils.MicroscopeFieldOfView(
         geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
     )
 

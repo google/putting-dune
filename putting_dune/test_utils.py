@@ -19,24 +19,24 @@ import datetime as dt
 
 import numpy as np
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from shapely import geometry
 
 
 def create_graphene_observation_with_single_silicon_in_fov(
     rng: np.random.Generator,
-) -> simulator_utils.SimulatorObservation:
+) -> microscope_utils.MicroscopeObservation:
   """Creates an observation of graphene with single silicon for unit tests."""
   graphene_sheet = graphene.PristineSingleDopedGraphene(rng)
   silicon_position = graphene_sheet.get_silicon_position()
-  fov = simulator_utils.SimulatorFieldOfView(
+  fov = microscope_utils.MicroscopeFieldOfView(
       geometry.Point((silicon_position[0] - 5.0, silicon_position[1] - 5.0)),
       geometry.Point((silicon_position[0] + 5.0, silicon_position[1] + 5.0)),
   )
-  observation = simulator_utils.SimulatorObservation(
+  observation = microscope_utils.MicroscopeObservation(
       graphene_sheet.get_atoms_in_bounds(fov.lower_left, fov.upper_right),
       fov,
-      None,
+      (),
       dt.timedelta(seconds=0),
   )
 

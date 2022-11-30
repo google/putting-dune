@@ -22,8 +22,8 @@ from matplotlib import animation
 from matplotlib import pyplot as plt
 import numpy as np
 from putting_dune import constants
+from putting_dune import microscope_utils
 from putting_dune import simulator_observers
-from putting_dune import simulator_utils
 
 _SimulatorEventType = simulator_observers.SimulatorEventType
 
@@ -38,7 +38,7 @@ def format_timedelta(delta: dt.timedelta) -> str:
 
 def _plot(
     ax: plt.Axes,
-    grid: simulator_utils.AtomicGrid,
+    grid: microscope_utils.AtomicGrid,
     goal_position: Optional[np.ndarray] = None,
     control_position: Optional[np.ndarray] = None,
     timedelta: Optional[dt.timedelta] = None,
@@ -83,7 +83,7 @@ def _plot(
 
 def plot_microscope_frame(
     ax: plt.Axes,
-    grid: simulator_utils.AtomicGrid,
+    grid: microscope_utils.AtomicGrid,
     goal_position: Optional[np.ndarray] = None,
     control_position: Optional[np.ndarray] = None,
     timedelta: Optional[dt.timedelta] = None,
@@ -99,11 +99,11 @@ def plot_microscope_frame(
 
 def plot_material_frame(
     ax: plt.Axes,
-    grid: simulator_utils.AtomicGrid,
+    grid: microscope_utils.AtomicGrid,
     goal_position: Optional[np.ndarray] = None,
     control_position: Optional[np.ndarray] = None,
     timedelta: Optional[dt.timedelta] = None,
-    fov: Optional[simulator_utils.SimulatorFieldOfView] = None,
+    fov: Optional[microscope_utils.MicroscopeFieldOfView] = None,
 ) -> None:
   """Plots the frame in supplied axis, with coordinates in material frame."""
   _plot(
@@ -148,8 +148,8 @@ def generate_video_from_simulator_events(
     goal_position: np.ndarray,
 ) -> animation.Animation:
   """Generates a video for the set of events."""
-  grid: simulator_utils.AtomicGrid = None
-  fov: simulator_utils.SimulatorFieldOfView = None
+  grid: microscope_utils.AtomicGrid = None
+  fov: microscope_utils.MicroscopeFieldOfView = None
   control_position: np.ndarray = None
   frames: List[Dict[str, Any]] = []
 
@@ -173,7 +173,7 @@ def generate_video_from_simulator_events(
     microscope_grid = args['fov'].material_grid_to_microscope_grid(args['grid'])
     # We make a grid containing just the goal and control to make it easy
     # to convert them to the microscope frame.
-    material_frame_data = simulator_utils.AtomicGrid(
+    material_frame_data = microscope_utils.AtomicGrid(
         atom_positions=np.stack([goal_position, args['control_position']]),
         atomic_numbers=np.asarray(()),  # Unused.
     )

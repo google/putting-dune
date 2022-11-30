@@ -23,7 +23,7 @@ from absl import logging
 from dm_env import specs
 import numpy as np
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from shapely import geometry
 from sklearn import neighbors
 
@@ -41,9 +41,9 @@ class ActionAdapter(abc.ABC):
   @abc.abstractmethod
   def get_action(
       self,
-      grid: simulator_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> List[simulator_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
 
   @property
@@ -68,9 +68,9 @@ class DeltaPositionActionAdapter(ActionAdapter):
 
   def get_action(
       self,
-      grid: simulator_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> List[simulator_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControl]:
     del grid  # Unused.
 
     self.beam_pos += action
@@ -79,7 +79,7 @@ class DeltaPositionActionAdapter(ActionAdapter):
     self.beam_pos = np.clip(self.beam_pos, 0.0, 1.0)
 
     return [
-        simulator_utils.BeamControl(
+        microscope_utils.BeamControl(
             geometry.Point(self.beam_pos[0], self.beam_pos[1]),
             # TODO(joshgreaves): Choose/parameterize dwell time.
             dt.timedelta(seconds=1.5),
@@ -102,9 +102,9 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
 
   def get_action(
       self,
-      grid: simulator_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGrid,
       action: np.ndarray,
-  ) -> List[simulator_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
     silicon_position = graphene.get_silicon_positions(grid)
 
@@ -142,7 +142,7 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
     control_position = silicon_position + (action * cell_radius)
 
     return [
-        simulator_utils.BeamControl(
+        microscope_utils.BeamControl(
             geometry.Point(*control_position), dt.timedelta(seconds=1.5)
         )
     ]

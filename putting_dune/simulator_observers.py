@@ -20,7 +20,7 @@ import datetime as dt
 import enum
 from typing import Any, Dict
 
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 
 
 class SimulatorEventType(enum.Enum):
@@ -38,7 +38,7 @@ class SimulatorEvent:
   event_data: Dict[str, Any]  # Not ideal, but saves a lot of boilerplate.
 
 
-class EventObserver(simulator_utils.SimulatorObserver):
+class EventObserver(microscope_utils.SimulatorObserver):
   """An observer that tracks events that occur in the simulator.
 
   The observed events are:
@@ -54,8 +54,8 @@ class EventObserver(simulator_utils.SimulatorObserver):
 
   def observe_reset(
       self,
-      grid: simulator_utils.AtomicGrid,
-      fov: simulator_utils.SimulatorFieldOfView,
+      grid: microscope_utils.AtomicGrid,
+      fov: microscope_utils.MicroscopeFieldOfView,
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.RESET,
@@ -66,7 +66,7 @@ class EventObserver(simulator_utils.SimulatorObserver):
     self.events = [event]
 
   def observe_transition(
-      self, time: dt.timedelta, grid: simulator_utils.AtomicGrid
+      self, time: dt.timedelta, grid: microscope_utils.AtomicGrid
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.TRANSITION, time, time, {'grid': grid}
@@ -74,7 +74,7 @@ class EventObserver(simulator_utils.SimulatorObserver):
     self.events.append(event)
 
   def observe_apply_control(
-      self, start_time: dt.timedelta, control: simulator_utils.BeamControl
+      self, start_time: dt.timedelta, control: microscope_utils.BeamControl
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.APPLY_CONTROL,
@@ -88,7 +88,7 @@ class EventObserver(simulator_utils.SimulatorObserver):
       self,
       start_time: dt.timedelta,
       end_time: dt.timedelta,
-      fov: simulator_utils.SimulatorFieldOfView,
+      fov: microscope_utils.MicroscopeFieldOfView,
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.TAKE_IMAGE, start_time, end_time, {'fov': fov}

@@ -27,9 +27,9 @@ from putting_dune import action_adapters
 from putting_dune import feature_constructors
 from putting_dune import goals
 from putting_dune import graphene
+from putting_dune import microscope_utils
 from putting_dune import plotting_utils
 from putting_dune import simulator
-from putting_dune import simulator_utils
 from shapely import geometry
 
 
@@ -58,12 +58,12 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self.goal = goals.SingleSiliconGoalReaching()
 
     # Variables that will be set on reset.
-    self._last_simulator_observation = simulator_utils.SimulatorObservation(
-        simulator_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14])),
-        simulator_utils.SimulatorFieldOfView(
+    self._last_microscope_observation = microscope_utils.MicroscopeObservation(
+        microscope_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14])),
+        microscope_utils.MicroscopeFieldOfView(
             geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
         ),
-        None,
+        (),
         dt.timedelta(seconds=0),
     )
 
@@ -88,17 +88,17 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._requires_reset = False
 
     # Generate a realistic doped graphene configuration.
-    self._last_simulator_observation = self.sim.reset()
+    self._last_microscope_observation = self.sim.reset()
     self._action_adapter.reset()
     self._feature_constructor.reset()
-    self.goal.reset(self._rng, self._last_simulator_observation)
+    self.goal.reset(self._rng, self._last_microscope_observation)
 
     return dm_env.TimeStep(
         step_type=dm_env.StepType.FIRST,
         reward=0.0,
         discount=0.99,
         observation=self._feature_constructor.get_features(
-            self._last_simulator_observation, self.goal
+            self._last_microscope_observation, self.goal
         ),
     )
 
@@ -111,24 +111,24 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # TODO(joshgreaves): Cache last probe position, and use it wherever
     # beam_position is required.
     simulator_control = self._action_adapter.get_action(
-        self._last_simulator_observation.grid, action
+        self._last_microscope_observation.grid, action
     )
 
     # 2. Step the simulator with the action returned from ActionAdapter.
-    self._last_simulator_observation = self.sim.step_and_image(
+    self._last_microscope_observation = self.sim.step_and_image(
         simulator_control
     )
 
     # 3. Create an observation with ObservationConstructor, using
     #    the new state returned from the simulator.
     observation = self._feature_constructor.get_features(
-        self._last_simulator_observation, self.goal
+        self._last_microscope_observation, self.goal
     )
 
     # 4. Calculate the reward (and terminal?) using RewardFunction.
     # Perhaps never terminate to teach the agent to keep the silicon at goal?
     goal_return = self.goal.calculate_reward_and_terminal(
-        self._last_simulator_observation
+        self._last_microscope_observation
     )
 
     # TODO(joshgreaves): Make discount configurable.
@@ -153,9 +153,12 @@ class PuttingDuneEnvironment(dm_env.Environment):
     ax = fig.subplots()
 
     # TODO(joshgreaves): beam_position lags by 1 timestep.
-    beam_position = self._last_simulator_observation.last_probe_position
-    if beam_position is not None:
-      beam_position = np.asarray(beam_position)
+    previous_controls = self._last_microscope_observation.controls
+    if previous_controls:
+      beam_position = np.asarray(previous_controls[-1].position)
+    else:
+      beam_position = None
+
     goal_position = np.asarray(
         self.sim.convert_point_to_microscope_frame(
             geometry.Point(self.goal.goal_position_material_frame)
@@ -164,7 +167,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     plotting_utils.plot_microscope_frame(
         ax,
-        self._last_simulator_observation.grid,
+        self._last_microscope_observation.grid,
         goal_position,
         beam_position,
         self.sim.elapsed_time,

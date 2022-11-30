@@ -22,7 +22,7 @@ from dm_env import specs
 import numpy as np
 from putting_dune import goals
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from sklearn import neighbors
 
 
@@ -40,7 +40,7 @@ class FeatureConstructor(abc.ABC):
   @abc.abstractmethod
   def get_features(
       self,
-      observation: simulator_utils.SimulatorObservation,
+      observation: microscope_utils.MicroscopeObservation,
       goal: goals.Goal,
   ) -> np.ndarray:
     """Gets features for an agent based on the osbervation and goal."""
@@ -61,7 +61,7 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
 
   def get_features(
       self,
-      observation: simulator_utils.SimulatorObservation,
+      observation: microscope_utils.MicroscopeObservation,
       goal: goals.Goal,
   ) -> np.ndarray:
     """Gets features for an agent based on the osbervation and goal."""

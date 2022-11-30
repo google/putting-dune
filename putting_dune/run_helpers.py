@@ -19,8 +19,8 @@ from typing import Sequence, cast
 
 from acme import wrappers
 from acme.utils.google import experiment_utils
+from putting_dune import microscope_utils
 from putting_dune import putting_dune_environment
-from putting_dune import simulator_utils
 
 make_logger = experiment_utils.make_experiment_logger
 
@@ -28,7 +28,7 @@ make_logger = experiment_utils.make_experiment_logger
 def create_putting_dune_env(
     seed: int,
     *,
-    simulator_observers: Sequence[simulator_utils.SimulatorObserver] = (),
+    simulator_observers: Sequence[microscope_utils.SimulatorObserver] = (),
     # 30 minutes, based on current exposure/image capturing times.
     step_limit: int = 600,
 ) -> putting_dune_environment.PuttingDuneEnvironment:

@@ -21,20 +21,20 @@ import numpy as np
 from putting_dune import action_adapters
 from putting_dune import constants
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 
 
-_EMPTY_GRID = simulator_utils.AtomicGrid(np.zeros(2), np.asarray([6]))
+_EMPTY_GRID = microscope_utils.AtomicGrid(np.zeros(2), np.asarray([6]))
 
 
 def _make_unit_hexagonal_grid(
     rng: np.random.Generator,
-) -> simulator_utils.AtomicGrid:
+) -> microscope_utils.AtomicGrid:
   material = graphene.PristineSingleDopedGraphene(rng)
   atom_positions = (
       material.atom_positions / constants.CARBON_BOND_DISTANCE_ANGSTROMS
   )
-  return simulator_utils.AtomicGrid(atom_positions, material.atomic_numbers)
+  return microscope_utils.AtomicGrid(atom_positions, material.atomic_numbers)
 
 
 class ActionAdaptersTest(parameterized.TestCase):
@@ -98,7 +98,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
+    self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
 
   @parameterized.named_parameters(
       dict(
@@ -141,7 +141,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
+    self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
     np.testing.assert_allclose(
         np.asarray(simulator_controls[0].position), expected_position
     )
@@ -165,14 +165,14 @@ class ActionAdaptersTest(parameterized.TestCase):
     simulator_controls = action_adapter.get_action(grid, delta)
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
+    self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
     np.testing.assert_allclose(
         np.asarray(simulator_controls[0].position), delta * grid_scale
     )
 
   def test_relative_adapter_has_acceptable_action_spec(self) -> None:
     material = graphene.PristineSingleDopedGraphene(np.random.default_rng(0))
-    grid = simulator_utils.AtomicGrid(
+    grid = microscope_utils.AtomicGrid(
         material.atom_positions, material.atomic_numbers
     )
     action_adapter = action_adapters.RelativeToSiliconActionAdapter()
@@ -185,7 +185,7 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
 
     self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(simulator_controls[0], simulator_utils.BeamControl)
+    self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
 
 
 if __name__ == '__main__':

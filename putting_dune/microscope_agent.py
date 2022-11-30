@@ -20,7 +20,7 @@ from typing import List
 import dm_env
 import numpy as np
 from putting_dune import experiment_registry
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 
 
 class MicroscopeAgent:
@@ -36,7 +36,7 @@ class MicroscopeAgent:
   def reset(
       self,
       rng: np.random.Generator,
-      observation: simulator_utils.SimulatorObservation,
+      observation: microscope_utils.MicroscopeObservation,
   ) -> None:
     """Resets the agent."""
     self.experiment.feature_constructor.reset()
@@ -47,8 +47,8 @@ class MicroscopeAgent:
 
   def step(
       self,
-      observation: simulator_utils.SimulatorObservation,
-  ) -> List[simulator_utils.BeamControl]:
+      observation: microscope_utils.MicroscopeObservation,
+  ) -> List[microscope_utils.BeamControl]:
     """Steps the agent."""
     features = self.experiment.feature_constructor.get_features(
         observation, self.experiment.goal

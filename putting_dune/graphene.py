@@ -22,13 +22,13 @@ from typing import Callable, Iterable, Tuple
 import numpy as np
 from putting_dune import constants
 from putting_dune import data_utils
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from shapely import geometry
 from sklearn import neighbors
 
 
 def simple_transition_rates(
-    grid: simulator_utils.AtomicGrid,
+    grid: microscope_utils.AtomicGrid,
     beam_pos: geometry.Point,
     current_position: np.ndarray,
     neighbor_indices: np.ndarray,
@@ -86,7 +86,7 @@ class HumanPriorRatePredictor:
 
   def predict(
       self,
-      grid: simulator_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGrid,
       beam_pos: geometry.Point,
       current_position: np.ndarray,
       neighbor_indices: np.ndarray,
@@ -130,7 +130,7 @@ class Material(abc.ABC):
   @abc.abstractmethod
   def get_atoms_in_bounds(
       self, lower_left: geometry.Point, upper_right: geometry.Point
-  ) -> simulator_utils.AtomicGrid:
+  ) -> microscope_utils.AtomicGrid:
     """Gets the atomic grid for a particular field of view.
 
     Args:
@@ -150,15 +150,15 @@ class Material(abc.ABC):
   @abc.abstractmethod
   def apply_control(
       self,
-      control: simulator_utils.BeamControl,
+      control: microscope_utils.BeamControl,
       start_time: dt.timedelta,
-      observers: Iterable[simulator_utils.SimulatorObserver] = (),
+      observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates controls applied to the material."""
 
   @property
   @abc.abstractmethod
-  def atomic_grid(self) -> simulator_utils.AtomicGrid:
+  def atomic_grid(self) -> microscope_utils.AtomicGrid:
     """Gets the atomic grid representing the current material state."""
 
 
@@ -254,7 +254,7 @@ def sample_point_away_from_edge(
 # 3 nearest neighbors, and returns the rate at which the silicon atom
 # swaps places with its nearest neighbors.
 RatePredictionFn = Callable[
-    [simulator_utils.AtomicGrid, geometry.Point, np.ndarray, np.ndarray],
+    [microscope_utils.AtomicGrid, geometry.Point, np.ndarray, np.ndarray],
     np.ndarray,
 ]
 
@@ -319,7 +319,7 @@ class PristineSingleDopedGraphene(Material):
 
   def get_atoms_in_bounds(
       self, lower_left: geometry.Point, upper_right: geometry.Point
-  ) -> simulator_utils.AtomicGrid:
+  ) -> microscope_utils.AtomicGrid:
     """Gets the atomic grid for a particular field of view.
 
     Args:
@@ -351,15 +351,15 @@ class PristineSingleDopedGraphene(Material):
         selected_atom_positions - lower_left.reshape(1, -1)
     ) / delta
 
-    return simulator_utils.AtomicGrid(
+    return microscope_utils.AtomicGrid(
         selected_atom_positions, selected_atomic_numbers
     )
 
   def apply_control(
       self,
-      control: simulator_utils.BeamControl,
+      control: microscope_utils.BeamControl,
       start_time: dt.timedelta,
-      observers: Iterable[simulator_utils.SimulatorObserver] = (),
+      observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates applying a beam exposure to the material."""
     # There is a chance that, if the dwell time is long enough, there
@@ -377,7 +377,7 @@ class PristineSingleDopedGraphene(Material):
       si_neighbors_index = si_neighbors_index[0, 1:]
 
       transition_rates = self._predict_rates(
-          simulator_utils.AtomicGrid(self.atom_positions, self.atomic_numbers),
+          microscope_utils.AtomicGrid(self.atom_positions, self.atomic_numbers),
           control.position,
           silicon_position,
           si_neighbors_index,
@@ -415,9 +415,9 @@ class PristineSingleDopedGraphene(Material):
           )
 
   @property
-  def atomic_grid(self) -> simulator_utils.AtomicGrid:
+  def atomic_grid(self) -> microscope_utils.AtomicGrid:
     """Gets the atomic grid representing the current material state."""
-    return simulator_utils.AtomicGrid(
+    return microscope_utils.AtomicGrid(
         self.atom_positions, np.copy(self.atomic_numbers)
     )
 
@@ -427,5 +427,5 @@ class PristineSingleDopedGraphene(Material):
     ].reshape(-1)
 
 
-def get_silicon_positions(grid: simulator_utils.AtomicGrid) -> np.ndarray:
+def get_silicon_positions(grid: microscope_utils.AtomicGrid) -> np.ndarray:
   return grid.atom_positions[grid.atomic_numbers == constants.SILICON]

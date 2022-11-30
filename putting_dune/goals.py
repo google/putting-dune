@@ -21,7 +21,7 @@ import dataclasses
 import numpy as np
 from putting_dune import constants
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from sklearn import neighbors
 
 
@@ -39,14 +39,14 @@ class Goal(abc.ABC):
   def reset(
       self,
       rng: np.random.Generator,
-      initial_observation: simulator_utils.SimulatorObservation,
+      initial_observation: microscope_utils.MicroscopeObservation,
   ):
     """Resets and picks a new goal."""
 
   @abc.abstractmethod
   def calculate_reward_and_terminal(
       self,
-      observation: simulator_utils.SimulatorObservation,
+      observation: microscope_utils.MicroscopeObservation,
   ) -> GoalReturn:
     """Calculates the reward and terminal signals for the goal."""
 
@@ -67,7 +67,7 @@ class SingleSiliconGoalReaching(Goal):
   def reset(
       self,
       rng: np.random.Generator,
-      initial_observation: simulator_utils.SimulatorObservation,
+      initial_observation: microscope_utils.MicroscopeObservation,
   ):
     """Resets the goal, picking a new position.
 
@@ -87,7 +87,7 @@ class SingleSiliconGoalReaching(Goal):
 
   def calculate_reward_and_terminal(
       self,
-      observation: simulator_utils.SimulatorObservation,
+      observation: microscope_utils.MicroscopeObservation,
   ) -> GoalReturn:
     """Calculates the reward and terminal signals for the goal.
 

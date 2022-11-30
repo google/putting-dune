@@ -13,11 +13,11 @@
 # limitations under the License.
 
 # pyformat: mode=pyink
-"""Shared utilities for simulator components."""
+"""Common utilities for microscope components."""
 
 import dataclasses
 import datetime as dt
-from typing import Optional
+from typing import Tuple
 
 import numpy as np
 from shapely import geometry
@@ -48,24 +48,7 @@ class BeamControl:
 
 
 @dataclasses.dataclass(frozen=True)
-class Transition:
-  """Specifications to control the simulator for one step.
-
-  Attributes:
-    grid: Atomic grid representation the observation.
-    shift: Shift applied to the camera position since last step, in angstroms.
-    control: Beam control parameters.
-    fov: Field of view (in angstroms).
-  """
-
-  grid: AtomicGrid
-  shift: geometry.Point
-  control: BeamControl
-
-
-
-@dataclasses.dataclass(frozen=True)
-class SimulatorFieldOfView:
+class MicroscopeFieldOfView:
   """A class that tracks where the microscope is scanning at any given time.
 
   Agents interact with the microscope by specifying controls in the
@@ -109,10 +92,11 @@ class SimulatorFieldOfView:
     return f'FOV [({ll.x:.2f}, {ll.y:.2f}), ({ur.x:.2f}, {ur.y:.2f})]'
 
 
+
 class SimulatorObserver:
   """An observer interface for observing events in the simulator."""
 
-  def observe_reset(self, grid: AtomicGrid, fov: SimulatorFieldOfView) -> None:
+  def observe_reset(self, grid: AtomicGrid, fov: MicroscopeFieldOfView) -> None:
     pass
 
   def observe_apply_control(
@@ -129,14 +113,37 @@ class SimulatorObserver:
       self,
       start_time: dt.timedelta,
       end_time: dt.timedelta,
-      fov: SimulatorFieldOfView,
+      fov: MicroscopeFieldOfView,
   ) -> None:
     pass
 
 
 @dataclasses.dataclass(frozen=True)
-class SimulatorObservation:
+class MicroscopeObservation:
+  """An observation from interacting with a microscope."""
+
   grid: AtomicGrid
-  fov: SimulatorFieldOfView
-  last_probe_position: Optional[geometry.Point]
+  fov: MicroscopeFieldOfView
+  controls: Tuple[BeamControl, ...]
   elapsed_time: dt.timedelta
+
+
+
+@dataclasses.dataclass(frozen=True)
+class Transition:
+  """A single transition from a microscope.
+
+  Attributes:
+    grid_before: Observed atomic grid before the transition.
+    grid_after: Observed atomic grid after the transition.
+    fov_before: The FOV before the transition.
+    fov_after: The FOV after the transition.
+    controls: Beam controls applied during the transition.
+  """
+
+  grid_before: AtomicGrid
+  grid_after: AtomicGrid
+  fov_before: MicroscopeFieldOfView
+  fov_after: MicroscopeFieldOfView
+  controls: Tuple[BeamControl, ...]
+

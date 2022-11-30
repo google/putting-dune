@@ -20,7 +20,7 @@ from typing import Sequence
 
 import numpy as np
 from putting_dune import graphene
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from shapely import geometry
 
 
@@ -34,7 +34,7 @@ class PuttingDuneSimulator:
       # assumes there is one silicon atom to follow.
       material: graphene.PristineSingleDopedGraphene,
       *,
-      observers: Sequence[simulator_utils.SimulatorObserver] = (),
+      observers: Sequence[microscope_utils.SimulatorObserver] = (),
   ):
     """PuttingDuneSimulator Constructor.
 
@@ -58,19 +58,19 @@ class PuttingDuneSimulator:
     # TODO(joshgreaves): Maybe add noise to fov initialization.
     # Initiate the fov with at least one silicon inside it.
     silicon_position = self.material.get_silicon_position()
-    self._fov = simulator_utils.SimulatorFieldOfView(
+    self._fov = microscope_utils.MicroscopeFieldOfView(
         geometry.Point(silicon_position - 10),
         geometry.Point(silicon_position + 10),
     )
 
-  def reset(self) -> simulator_utils.SimulatorObservation:
+  def reset(self) -> microscope_utils.MicroscopeObservation:
     """Reset to a plausible simulator state."""
     # Re-initialize the material.
     self.material.reset()
 
     # Initiate the fov with the silicon inside it.
     silicon_position = self.material.get_silicon_position()
-    self._fov = simulator_utils.SimulatorFieldOfView(
+    self._fov = microscope_utils.MicroscopeFieldOfView(
         geometry.Point(silicon_position - 10),
         geometry.Point(silicon_position + 10),
     )
@@ -81,14 +81,14 @@ class PuttingDuneSimulator:
 
     observed_grid = self._image_material()
 
-    return simulator_utils.SimulatorObservation(
-        observed_grid, self._fov, None, self.elapsed_time
+    return microscope_utils.MicroscopeObservation(
+        observed_grid, self._fov, (), self.elapsed_time
     )
 
   def step_and_image(
       self,
-      controls: Sequence[simulator_utils.BeamControl],
-  ) -> simulator_utils.SimulatorObservation:
+      controls: Sequence[microscope_utils.BeamControl],
+  ) -> microscope_utils.MicroscopeObservation:
     """Update simulator state based on beam position delta.
 
     This emulates the behavior of the real STEM, where we choose a series
@@ -105,7 +105,7 @@ class PuttingDuneSimulator:
       # Convert the control from the microscope frame to material frame.
       # TODO(joshgreaves): Control clipping to [0, 1]?
       control_position = self.convert_point_to_material_frame(control.position)
-      control = simulator_utils.BeamControl(
+      control = microscope_utils.BeamControl(
           control_position, control.dwell_time
       )
 
@@ -132,24 +132,24 @@ class PuttingDuneSimulator:
       # frame, but we can just get the coordinate of the atom directly
       # from the material.
       silicon_position = self.material.get_silicon_position()
-      self._fov = simulator_utils.SimulatorFieldOfView(
+      self._fov = microscope_utils.MicroscopeFieldOfView(
           geometry.Point(silicon_position - 10),
           geometry.Point(silicon_position + 10),
       )
       observed_grid = self._image_material()
 
-    return simulator_utils.SimulatorObservation(
+    return microscope_utils.MicroscopeObservation(
         observed_grid,
         self._fov,
-        controls[-1].position,
+        tuple(controls),
         self.elapsed_time,
     )
 
-  def add_observer(self, observer: simulator_utils.SimulatorObserver) -> None:
+  def add_observer(self, observer: microscope_utils.SimulatorObserver) -> None:
     self._observers.append(observer)
 
   def remove_observer(
-      self, observer: simulator_utils.SimulatorObserver
+      self, observer: microscope_utils.SimulatorObserver
   ) -> None:
     self._observers.remove(observer)
 
@@ -160,7 +160,7 @@ class PuttingDuneSimulator:
     """Converts a point from microscope frame to material frame."""
     # We make a fake atomic grid with just the control to benefit from
     # the code that transforms grids.
-    grid = simulator_utils.AtomicGrid(
+    grid = microscope_utils.AtomicGrid(
         np.asarray(point).reshape(1, 2), np.zeros(1)
     )
     grid = self._fov.microscope_grid_to_material_grid(grid)
@@ -173,13 +173,13 @@ class PuttingDuneSimulator:
     """Converts a point from material frame to microscope frame."""
     # We make a fake atomic grid with just the control to benefit from
     # the code that transforms grids.
-    grid = simulator_utils.AtomicGrid(
+    grid = microscope_utils.AtomicGrid(
         np.asarray(point).reshape(1, 2), np.zeros(1)
     )
     grid = self._fov.material_grid_to_microscope_grid(grid)
     return geometry.Point(grid.atom_positions.reshape(-1))
 
-  def _image_material(self) -> simulator_utils.AtomicGrid:
+  def _image_material(self) -> microscope_utils.AtomicGrid:
     """Images the material and returns the observation."""
     # Note: Currently we do not expect atoms/defects to diffuse through
     # the graphene sheet during an image capture. However, if this changes,

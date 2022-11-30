@@ -21,7 +21,7 @@ from absl.testing import absltest
 import numpy as np
 from putting_dune import experiment_registry
 from putting_dune import microscope_agent
-from putting_dune import simulator_utils
+from putting_dune import microscope_utils
 from putting_dune import test_utils
 
 
@@ -74,7 +74,7 @@ class MicroscopeAgentTest(absltest.TestCase):
 
     self.assertIsInstance(controls, list)
     self.assertLen(controls, 1)
-    self.assertIsInstance(controls[0], simulator_utils.BeamControl)
+    self.assertIsInstance(controls[0], microscope_utils.BeamControl)
 
 
 if __name__ == '__main__':
