@@ -21,7 +21,7 @@ from absl.testing import absltest
 import dm_env
 import numpy as np
 from putting_dune import goals
-from putting_dune import putting_dune_environment
+from putting_dune import run_helpers
 
 
 # These actions are for the DeltaPositionActionAdapter.
@@ -43,13 +43,11 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.env = putting_dune_environment.PuttingDuneEnvironment()
+    # We use the environment created from run_helpers for convenience.
+    self.env = run_helpers.create_putting_dune_env(0)
     self.env.seed(0)
 
   def test_environment_is_initialized_correctly(self):
-    self.assertIsInstance(
-        self.env, putting_dune_environment.PuttingDuneEnvironment
-    )
     self.assertIsInstance(self.env, dm_env.Environment)
 
   def test_environment_reset(self):
@@ -61,14 +59,13 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
     )
 
   def test_environment_step(self):
-    env = putting_dune_environment.PuttingDuneEnvironment()
-    env.reset()
+    self.env.reset()
     action = np.zeros((2,), dtype=np.float32)
-    step = env.step(action)
+    step = self.env.step(action)
 
     self.assertIsInstance(step, dm_env.TimeStep)
     self.assertSequenceEqual(
-        step.observation.shape, env.observation_spec().shape
+        step.observation.shape, self.env.observation_spec().shape
     )
 
   def test_environment_render(self):
@@ -98,40 +95,36 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
       self.assertTrue((step1.observation == step2.observation).all())
 
   def test_environment_obeys_reset_semantics_on_creation(self):
-    env = putting_dune_environment.PuttingDuneEnvironment()
-
-    step = env.step(_ARBITRARY_ACTIONS[0])
+    step = self.env.step(_ARBITRARY_ACTIONS[0])
 
     self.assertEqual(step.step_type, dm_env.StepType.FIRST)
 
   def test_environment_obeys_reset_semantics_after_last_step(self):
-    env = putting_dune_environment.PuttingDuneEnvironment()
-    env.goal.calculate_reward_and_terminal = mock.MagicMock(
+    self.env.goal.calculate_reward_and_terminal = mock.MagicMock(
         return_value=goals.GoalReturn(
             reward=0.0, is_terminal=True, is_truncated=False
         )
     )
-    env.reset()
+    self.env.reset()
 
     # Mocked to be a terminal step.
-    step1 = env.step(_ARBITRARY_ACTIONS[0])
+    step1 = self.env.step(_ARBITRARY_ACTIONS[0])
 
     # Should trigger a reset.
-    step2 = env.step(_ARBITRARY_ACTIONS[1])
+    step2 = self.env.step(_ARBITRARY_ACTIONS[1])
 
     self.assertEqual(step1.step_type, dm_env.StepType.LAST)
     self.assertEqual(step2.step_type, dm_env.StepType.FIRST)
 
   def test_environment_truncates_correctly(self):
-    env = putting_dune_environment.PuttingDuneEnvironment()
-    env.goal.calculate_reward_and_terminal = mock.MagicMock(
+    self.env.goal.calculate_reward_and_terminal = mock.MagicMock(
         return_value=goals.GoalReturn(
             reward=0.0, is_terminal=False, is_truncated=True
         )
     )
-    env.reset()
+    self.env.reset()
 
-    step = env.step(_ARBITRARY_ACTIONS[0])
+    step = self.env.step(_ARBITRARY_ACTIONS[0])
 
     self.assertEqual(step.step_type, dm_env.StepType.LAST)
     self.assertGreater(step.discount, 0.0)

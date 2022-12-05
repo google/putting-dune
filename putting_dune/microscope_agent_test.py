@@ -22,6 +22,7 @@ import numpy as np
 from putting_dune import experiment_registry
 from putting_dune import microscope_agent
 from putting_dune import microscope_utils
+from putting_dune import putting_dune_environment
 from putting_dune import test_utils
 
 
@@ -36,17 +37,19 @@ class MicroscopeAgentTest(absltest.TestCase):
     experiment = experiment_registry.create_experiment('relative_random', rng)
     mock_agent = mock.create_autospec(experiment.agent, spec_set=True)
     mock_action_adapter = mock.create_autospec(
-        experiment.action_adapter, spec_set=True
+        experiment.env_config.action_adapter, spec_set=True
     )
     mock_feature_constructor = mock.create_autospec(
-        experiment.feature_constructor, spec_set=True
+        experiment.env_config.feature_constructor, spec_set=True
     )
-    mock_goal = mock.create_autospec(experiment.goal, spec_set=True)
+    mock_goal = mock.create_autospec(experiment.env_config.goal, spec_set=True)
     mock_experiment = experiment_registry.Experiment(
         agent=mock_agent,
-        action_adapter=mock_action_adapter,
-        feature_constructor=mock_feature_constructor,
-        goal=mock_goal,
+        env_config=putting_dune_environment.EnvironmentConfiguration(
+            action_adapter=mock_action_adapter,
+            feature_constructor=mock_feature_constructor,
+            goal=mock_goal,
+        ),
     )
     agent = microscope_agent.MicroscopeAgent(mock_experiment)
 

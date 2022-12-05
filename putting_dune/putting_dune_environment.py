@@ -15,8 +15,10 @@
 # pyformat: mode=pyink
 """Putting Dune Environment for use with RL agents."""
 
+import dataclasses
 import datetime as dt
 import enum
+import typing
 from typing import Optional
 
 import dm_env
@@ -38,10 +40,22 @@ class RatePredictorType(str, enum.Enum):
   SIMPLE = 'simple'
 
 
+@dataclasses.dataclass(frozen=True)
+class EnvironmentConfiguration:
+  action_adapter: action_adapters.ActionAdapter
+  feature_constructor: feature_constructors.FeatureConstructor
+  goal: goals.Goal
+
+
 class PuttingDuneEnvironment(dm_env.Environment):
   """Putting Dune Environment."""
 
-  def __init__(self):
+  def __init__(
+      self,
+      action_adapter: action_adapters.ActionAdapter,
+      feature_constructor: feature_constructors.FeatureConstructor,
+      goal: goals.Goal,
+  ):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
@@ -51,11 +65,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
     )
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
-    self._action_adapter = action_adapters.RelativeToSiliconActionAdapter()
-    self._feature_constructor = (
-        feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor()
-    )
-    self.goal = goals.SingleSiliconGoalReaching()
+    self._action_adapter = action_adapter
+    self._feature_constructor = feature_constructor
+    self.goal = goal
 
     # Variables that will be set on reset.
     self._last_microscope_observation = microscope_utils.MicroscopeObservation(
@@ -159,11 +171,14 @@ class PuttingDuneEnvironment(dm_env.Environment):
     else:
       beam_position = None
 
-    goal_position = np.asarray(
-        self.sim.convert_point_to_microscope_frame(
-            geometry.Point(self.goal.goal_position_material_frame)
-        )
-    )
+    goal_position = None
+    if isinstance(self.goal, goals.SingleSiliconGoalReaching):
+      goal = typing.cast(goals.SingleSiliconGoalReaching, self.goal)
+      goal_position = np.asarray(
+          self.sim.convert_point_to_microscope_frame(
+              geometry.Point(goal.goal_position_material_frame)
+          )
+      )
 
     plotting_utils.plot_microscope_frame(
         ax,

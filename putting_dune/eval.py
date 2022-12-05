@@ -47,9 +47,10 @@ def main(args: Args) -> None:
   # Set up the environment.
   # Note: We pass in an arbitrary seed here, since evaluate will
   # pass in a specific seed for each episode.
-  # TODO(joshgreaves): Pass the relative objects from the experiment into
-  # the environment.
-  env = run_helpers.create_putting_dune_env(seed=0)
+  env = run_helpers.create_putting_dune_env(
+      seed=0,
+      env_config_factory=(lambda: experiment.env_config),
+  )
 
   # Set up the eval suite.
   eval_suite = eval_lib.EVAL_SUITES[args.eval_suite]

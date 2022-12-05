@@ -24,15 +24,14 @@ from putting_dune import action_adapters
 from putting_dune import agent_lib
 from putting_dune import feature_constructors
 from putting_dune import goals
+from putting_dune import putting_dune_environment
 
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Experiment:
   agent: agent_lib.Agent
-  action_adapter: action_adapters.ActionAdapter
-  feature_constructor: feature_constructors.FeatureConstructor
-  goal: goals.Goal
+  env_config: putting_dune_environment.EnvironmentConfiguration
 
 
 def _random_experiment(rng: np.random.Generator) -> Experiment:
@@ -45,9 +44,11 @@ def _random_experiment(rng: np.random.Generator) -> Experiment:
           action_adapter.action_spec.maximum,
           action_adapter.action_spec.shape,
       ),
-      action_adapter=action_adapter,
-      feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
-      goal=goals.SingleSiliconGoalReaching(),
+      env_config=putting_dune_environment.EnvironmentConfiguration(
+          action_adapter=action_adapter,
+          feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
+          goal=goals.SingleSiliconGoalReaching(),
+      ),
   )
 
 

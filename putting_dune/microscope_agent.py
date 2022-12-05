@@ -30,7 +30,8 @@ class MicroscopeAgent:
       self,
       experiment=experiment_registry.Experiment,
   ):
-    self.experiment = experiment
+    self.agent = experiment.agent
+    self.env_config = experiment.env_config
     self._is_first_step = True
 
   def reset(
@@ -39,9 +40,9 @@ class MicroscopeAgent:
       observation: microscope_utils.MicroscopeObservation,
   ) -> None:
     """Resets the agent."""
-    self.experiment.feature_constructor.reset()
-    self.experiment.goal.reset(rng, observation)
-    self.experiment.action_adapter.reset()
+    self.env_config.feature_constructor.reset()
+    self.env_config.goal.reset(rng, observation)
+    self.env_config.action_adapter.reset()
 
     self._is_first_step = True
 
@@ -50,10 +51,10 @@ class MicroscopeAgent:
       observation: microscope_utils.MicroscopeObservation,
   ) -> List[microscope_utils.BeamControl]:
     """Steps the agent."""
-    features = self.experiment.feature_constructor.get_features(
-        observation, self.experiment.goal
+    features = self.env_config.feature_constructor.get_features(
+        observation, self.env_config.goal
     )
-    goal_return = self.experiment.goal.calculate_reward_and_terminal(
+    goal_return = self.env_config.goal.calculate_reward_and_terminal(
         observation
     )
 
@@ -75,9 +76,9 @@ class MicroscopeAgent:
     else:
       time_step = dm_env.transition(goal_return.reward, features, discount)
 
-    action = self.experiment.agent.step(time_step)
+    action = self.agent.step(time_step)
 
-    beam_control = self.experiment.action_adapter.get_action(
+    beam_control = self.env_config.action_adapter.get_action(
         observation.grid, action
     )
 
