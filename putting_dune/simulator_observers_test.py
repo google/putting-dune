@@ -19,9 +19,9 @@ import datetime as dt
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import geometry
 from putting_dune import microscope_utils
 from putting_dune import simulator_observers
-from shapely import geometry
 
 
 class SimulatorObserversTest(absltest.TestCase):

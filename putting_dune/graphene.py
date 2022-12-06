@@ -19,12 +19,24 @@ import abc
 import datetime as dt
 from typing import Callable, Iterable, Tuple
 
+from jax.scipy import stats
 import numpy as np
 from putting_dune import constants
-from putting_dune import data_utils
+from putting_dune import geometry
 from putting_dune import microscope_utils
-from shapely import geometry
 from sklearn import neighbors
+
+
+def single_silicon_prior_rates(
+    context: np.ndarray,
+    mean: np.ndarray,
+    cov: np.ndarray,
+    max_rate: float,
+):
+  """Gets transition rates as following a Gaussian curve with given maximum."""
+  norm = max_rate / stats.multivariate_normal.pdf(mean, mean, cov)
+  rate = stats.multivariate_normal.pdf(context, mean, cov)
+  return rate * norm
 
 
 def simple_transition_rates(
@@ -108,14 +120,14 @@ class HumanPriorRatePredictor:
 
     neighbor_positions = grid.atom_positions[neighbor_indices, :]
     relative_neighbor_positions = neighbor_positions - current_position
-    angles = data_utils.get_neighbor_angles(relative_neighbor_positions)
+    angles = geometry.get_angles(relative_neighbor_positions)
 
     relative_beam_position = beam_pos - current_position
     relative_beam_position /= constants.CARBON_BOND_DISTANCE_ANGSTROMS
     rates = np.zeros((neighbor_indices.shape), dtype=float)
     for i, angle in enumerate(angles):
-      rotated_mean = data_utils.rotate_coordinates(self.mean, -angle)
-      rate = data_utils.prior_rates(
+      rotated_mean = geometry.rotate_coordinates(self.mean, -angle)
+      rate = single_silicon_prior_rates(
           relative_beam_position, rotated_mean, self.cov, self.max_rate
       )
       rates[i] = rate

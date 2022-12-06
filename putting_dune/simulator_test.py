@@ -22,11 +22,11 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from putting_dune import action_adapters
+from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
 from putting_dune import simulator
 from putting_dune import simulator_observers
-from shapely import geometry
 
 
 _ARBITRARY_CONTROL = microscope_utils.BeamControl(

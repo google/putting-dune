@@ -20,7 +20,7 @@ import datetime as dt
 from typing import Tuple
 
 import numpy as np
-from shapely import geometry
+from putting_dune import geometry
 
 
 

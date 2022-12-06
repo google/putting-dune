@@ -18,9 +18,9 @@
 import datetime as dt
 
 import numpy as np
+from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
-from shapely import geometry
 
 
 def create_graphene_observation_with_single_silicon_in_fov(

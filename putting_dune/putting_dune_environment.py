@@ -27,12 +27,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from putting_dune import action_adapters
 from putting_dune import feature_constructors
+from putting_dune import geometry
 from putting_dune import goals
 from putting_dune import graphene
 from putting_dune import microscope_utils
 from putting_dune import plotting_utils
 from putting_dune import simulator
-from shapely import geometry
 
 
 class RatePredictorType(str, enum.Enum):

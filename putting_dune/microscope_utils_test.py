@@ -19,8 +19,8 @@ import datetime as dt
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import geometry
 from putting_dune import microscope_utils
-from shapely import geometry
 
 
 _ATOMIC_GRID = microscope_utils.AtomicGrid(

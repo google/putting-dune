@@ -22,9 +22,9 @@ from typing import List
 from dm_env import specs
 import numpy as np
 from putting_dune import constants
+from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
-from shapely import geometry
 
 
 class ActionAdapter(abc.ABC):
