@@ -22,7 +22,6 @@ import numpy as np
 from putting_dune import constants
 from putting_dune import graphene
 from putting_dune import microscope_utils
-from sklearn import neighbors
 
 
 @dataclasses.dataclass(frozen=True)
@@ -60,6 +59,9 @@ class SingleSiliconGoalReaching(Goal):
     # relative-to-silicon action adapter.
     self._required_consecutive_goal_steps_for_termination = 1
 
+    # Will sample a goal within this distance range.
+    self.goal_range_angstroms = (0.1, 50.0)
+
     # Will be set on reset.
     self.goal_position_material_frame = np.zeros((2,), dtype=np.float32)
     self._consecutive_goal_steps = 0
@@ -68,20 +70,58 @@ class SingleSiliconGoalReaching(Goal):
       self,
       rng: np.random.Generator,
       initial_observation: microscope_utils.MicroscopeObservation,
-  ):
+  ) -> None:
     """Resets the goal, picking a new position.
 
     Args:
       rng: The RNG to use for sampling a new goal.
       initial_observation: The initial simulator observation.
+
+    Raises:
+      RuntimeError: If the number of observed silicons is not 1.
     """
     # TODO(joshgreaves): Enable ability to sample goals outside FOV.
-    num_atoms, _ = initial_observation.grid.atom_positions.shape
-    atom_idx = rng.choice(num_atoms)
+    silicon_position = graphene.get_silicon_positions(initial_observation.grid)
+    num_silicon_atoms, _ = silicon_position.shape
+    if num_silicon_atoms != 1:
+      raise RuntimeError(
+          f'{self.__class__} expected to find a single silicon atom. Instead,'
+          f' {num_silicon_atoms} were found.'
+      )
+
+    # Get the distance of every atom from the silicon atom.
+    # Center atoms on silicon atom, and then account for the FOV
+    # before working out the distances in angstroms.
+    shifted_atom_positions = (
+        initial_observation.grid.atom_positions - silicon_position
+    )
+
+    scale = np.asarray(
+        [initial_observation.fov.width, initial_observation.fov.height]
+    )
+    scaled_shifted_atom_positions = scale * shifted_atom_positions
+
+    distances = np.linalg.norm(scaled_shifted_atom_positions, axis=1)
+
+    # Select the atoms that are in the desired distance range.
+    min_distance, max_distance = self.goal_range_angstroms
+    valid_distances = (distances < max_distance) & (distances > min_distance)
+    valid_goals = initial_observation.grid.atom_positions[valid_distances]
+
+    num_goals, _ = valid_goals.shape
+    if num_goals == 0:
+      raise RuntimeError("Couldn't find any valid goals.")
+
+    goal_idx = rng.choice(num_goals)
+    goal_position = valid_goals[goal_idx]
+
+    goal_grid = microscope_utils.AtomicGrid(
+        goal_position, np.asarray([constants.CARBON])
+    )
     self.goal_position_material_frame = (
         initial_observation.fov.microscope_grid_to_material_grid(
-            initial_observation.grid
-        ).atom_positions[atom_idx]
+            goal_grid
+        ).atom_positions[0, :]
     )
     self._consecutive_goal_steps = 0
 
@@ -135,22 +175,4 @@ class SingleSiliconGoalReaching(Goal):
         >= self._required_consecutive_goal_steps_for_termination
     )
 
-    # Truncate if near the graphene edge.
-    nearest_neighbors = neighbors.NearestNeighbors(
-        n_neighbors=1 + 3,
-        metric='l2',
-        algorithm='brute',
-    ).fit(material_frame_grid.atom_positions)
-    si_neighbor_distances, _ = nearest_neighbors.kneighbors(
-        silicon_position_material_frame.reshape(1, 2)
-    )
-
-    # If any of the neighbors are much greater than the expected bond distance,
-    # then there aren't three neighbors and we're at the edge.
-    # Since the neighbors are sorted, just look at the furthest neighbor.
-    is_truncation = (
-        si_neighbor_distances[0, -1]
-        > constants.CARBON_BOND_DISTANCE_ANGSTROMS * 1.1
-    )
-
-    return GoalReturn(-cost, is_terminal, is_truncation)
+    return GoalReturn(reward=-cost, is_terminal=is_terminal, is_truncated=False)

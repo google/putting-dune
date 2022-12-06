@@ -15,13 +15,13 @@
 # pyformat: mode=pyink
 """Tests for goals."""
 
-from unittest import mock
-
 from absl.testing import absltest
 import numpy as np
 from putting_dune import constants
+from putting_dune import geometry
 from putting_dune import goals
 from putting_dune import graphene
+from putting_dune import microscope_utils
 from putting_dune import simulator
 
 
@@ -34,7 +34,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     # Make a small graphene sheet to more thoroughly test what happens
     # at the edge of a graphene sheet.
     self.material = graphene.PristineSingleDopedGraphene(
-        self.rng, grid_columns=10
+        self.rng, grid_columns=20
     )
     self.sim = simulator.PuttingDuneSimulator(self.material)
 
@@ -50,14 +50,20 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
       self.assertLess(neighbor_distances[0, 0], 1e-3)
 
   def test_goal_position_is_not_set_near_an_edge(self):
+    # This is enforced implicitly - the goal is an atom position within
+    # the field of view, and the simulator initiates the silicon close to
+    # the center of the simulated material.
+
     # Reset several times to check it's not near an edge.
     for _ in range(100):
       obs = self.sim.reset()
       self.goal.reset(self.rng, obs)
 
+      # We look at the neighbor distances in the material frame.
       neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
           self.goal.goal_position_material_frame.reshape(1, -1)
       )
+      print(neighbor_distances)
       self.assertLessEqual(
           neighbor_distances[0, -1],
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
@@ -82,25 +88,55 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
   def test_returns_terminal_when_silicon_is_at_goal(self):
     obs = self.sim.reset()
     self.goal.reset(self.rng, obs)
-    self.material.get_silicon_position = mock.MagicMock(
-        return_value=self.goal.goal_position_material_frame
+
+    # Make an observation with the silicon at the goal position.
+    silicon_position = graphene.get_silicon_positions(obs.grid)
+    self.assertEqual(silicon_position.shape, (1, 2))
+    obs = microscope_utils.MicroscopeObservation(
+        # Put the silicon right in the center of the fov for convenience.
+        grid=microscope_utils.AtomicGrid(
+            atom_positions=obs.grid.atom_positions - silicon_position + 0.5,
+            atomic_numbers=obs.grid.atomic_numbers,
+        ),
+        fov=microscope_utils.MicroscopeFieldOfView(
+            lower_left=geometry.Point(
+                self.goal.goal_position_material_frame - 10.0
+            ),
+            upper_right=geometry.Point(
+                self.goal.goal_position_material_frame + 10.0
+            ),
+        ),
+        controls=obs.controls,
+        elapsed_time=obs.elapsed_time,
     )
 
     result = self.goal.calculate_reward_and_terminal(obs)
 
     self.assertTrue(result.is_terminal)
 
-  def test_truncation_is_applied_at_graphene_edge(self):
+  def test_no_goals_within_1_angstrom(self):
     obs = self.sim.reset()
-    self.goal.reset(self.rng, obs)
+    self.goal.goal_range_angstroms = (0.1, 1.0)
 
-    # Manually position the silicon at the further position from the
-    # center, which is guaranteed to be a edge (a corner, specifically).
-    atom_distances = np.linalg.norm(self.material.atom_positions, axis=1)
-    furthest_idx = np.argmax(atom_distances)
-    self.material.atomic_numbers[:] = constants.CARBON
-    self.material.atomic_numbers[furthest_idx] = constants.SILICON
+    with self.assertRaises(RuntimeError):
+      self.goal.reset(self.rng, obs)
 
-    result = self.goal.calculate_reward_and_terminal(obs)
+  def test_three_possible_goals_one_step_away(self):
+    obs = self.sim.reset()
+    # 1.42 = 1 bond distance.
+    self.goal.goal_range_angstroms = (1.40, 1.44)
 
-    self.assertTrue(result.is_truncated)
+    # Select a goal many times. We should see each goal at least once.
+    observed_goal_positions = set()
+    for _ in range(30):
+      self.goal.reset(self.rng, obs)
+      goal_position = self.goal.goal_position_material_frame.copy()
+      observed_goal_positions.add(
+          (round(goal_position[0], 5), round(goal_position[1], 5))
+      )
+
+    self.assertLen(observed_goal_positions, 3)
+
+
+if __name__ == '__main__':
+  absltest.main()

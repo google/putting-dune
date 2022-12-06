@@ -60,6 +60,22 @@ class SimulatorUtilsTest(absltest.TestCase):
     offset = np.asarray(fov.offset)
     np.testing.assert_allclose(offset, np.asarray([0.5, 2.0]))
 
+  def test_field_of_view_correctly_calculates_width(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((0.0, 1.0)),
+        upper_right=geometry.Point((1.0, 3.0)),
+    )
+
+    self.assertAlmostEqual(fov.width, 1.0)
+
+  def test_field_of_view_correctly_calculates_height(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((0.0, 1.0)),
+        upper_right=geometry.Point((1.0, 3.0)),
+    )
+
+    self.assertAlmostEqual(fov.height, 2.0)
+
   def test_fov_to_string_formats_string_as_expected(self):
     fov = microscope_utils.MicroscopeFieldOfView(
         lower_left=geometry.Point((0.128, -5.699)),

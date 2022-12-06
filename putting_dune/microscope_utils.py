@@ -68,6 +68,14 @@ class MicroscopeFieldOfView:
         (np.asarray(self.lower_left) + np.asarray(self.upper_right)) / 2
     )
 
+  @property
+  def width(self) -> float:
+    return self.upper_right.x - self.lower_left.x
+
+  @property
+  def height(self) -> float:
+    return self.upper_right.y - self.lower_left.y
+
   def microscope_grid_to_material_grid(self, grid: AtomicGrid) -> AtomicGrid:
     lower_left = np.asarray(self.lower_left).reshape(1, 2)
     upper_right = np.asarray(self.upper_right).reshape(1, 2)

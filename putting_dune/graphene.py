@@ -17,7 +17,7 @@
 
 import abc
 import datetime as dt
-from typing import Callable, Iterable, Tuple
+from typing import Callable, Iterable
 
 from jax.scipy import stats
 import numpy as np
@@ -214,53 +214,6 @@ def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
   return np.stack((coord_x, coord_y), axis=1)
 
 
-def sample_point_away_from_edge(
-    rng: np.random.Generator,
-    atom_positions: np.ndarray,
-    nearest_neighbors: neighbors.NearestNeighbors,
-    *,
-    border_atom_positions: int = 8,
-) -> Tuple[np.ndarray, int]:
-  """Samples a point away from the edge of an atomic grid.
-
-  Args:
-    rng: The generator to use for sampling.
-    atom_positions: The positions of the atoms in the atomic grid. should have
-      shape (num_atoms, 2).
-    nearest_neighbors: A nearest neighbors object for the supplied atom
-      positions.
-    border_atom_positions: The number of atomic positions to use as a border.
-      i.e. the minimum number of atomic positions from the edge we should
-      sample.
-
-  Returns:
-    A tuple containig the sampled coordinate from the grid with shape (2,),
-      and the index it corresponds to from atom_positions.
-  """
-  # An easy way to pick a goal that is not near an adge is to contract
-  # all the points, and then pick from the contracted points, and finally
-  # pick the closest original point to the selected contracted point.
-  max_atom_l2_distance = np.max(np.linalg.norm(atom_positions, axis=1, ord=2))
-  border_length = (
-      border_atom_positions * constants.CARBON_BOND_DISTANCE_ANGSTROMS
-  )
-  contraction = 1 - border_length / max_atom_l2_distance
-  # Some very small grids might have a negative contraction, so clip it.
-  contraction = max(contraction, 0.1)
-  assert contraction < 1.0
-  contracted_points = atom_positions * contraction
-
-  # Randomly select from the contracted points.
-  num_atoms, _ = contracted_points.shape
-  goal_position = contracted_points[rng.choice(num_atoms, 1)]
-
-  # Pick the point on the lattice closest to the contracted goal position.
-  _, neighbor_indices = nearest_neighbors.kneighbors(
-      goal_position.reshape(1, 2)
-  )
-  return atom_positions[neighbor_indices[0, 0]], neighbor_indices[0, 0]
-
-
 # A function that takes an atomic grid representing the current material
 # state, a probe position, a silicon atom position, and positions of the
 # 3 nearest neighbors, and returns the rate at which the silicon atom
@@ -324,9 +277,9 @@ class PristineSingleDopedGraphene(Material):
     num_atoms = self.atom_positions.shape[0]
     self.atomic_numbers = np.full(num_atoms, constants.CARBON)
 
-    _, si_index = sample_point_away_from_edge(
-        self.rng, self.atom_positions, self.nearest_neighbors
-    )
+    # Choose the point closest to the center for the silicon starting point.
+    distances = np.linalg.norm(self.atom_positions, axis=1)
+    si_index = np.argmin(distances)
     self.atomic_numbers[si_index] = constants.SILICON
 
   def get_atoms_in_bounds(
