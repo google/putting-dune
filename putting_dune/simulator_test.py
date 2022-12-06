@@ -196,7 +196,7 @@ class SimulatorTest(parameterized.TestCase):
     # Position control near the silicon to trigger an event.
     # We can reuse the relative action adapter to make things easier.
     action_adapter = action_adapters.RelativeToSiliconActionAdapter()
-    controls = action_adapter.get_action(obs.grid, np.asarray([0.5, 0.5]))
+    controls = action_adapter.get_action(obs, np.asarray([0.5, 0.5]))
     sim.step_and_image(controls)
 
     events = observer.events

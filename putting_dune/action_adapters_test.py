@@ -19,25 +19,15 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from putting_dune import action_adapters
-from putting_dune import constants
-from putting_dune import graphene
 from putting_dune import microscope_utils
-
-
-_EMPTY_GRID = microscope_utils.AtomicGrid(np.zeros(2), np.asarray([6]))
-
-
-def _make_unit_hexagonal_grid(
-    rng: np.random.Generator,
-) -> microscope_utils.AtomicGrid:
-  material = graphene.PristineSingleDopedGraphene(rng)
-  atom_positions = (
-      material.atom_positions / constants.CARBON_BOND_DISTANCE_ANGSTROMS
-  )
-  return microscope_utils.AtomicGrid(atom_positions, material.atomic_numbers)
+from putting_dune import test_utils
 
 
 class ActionAdaptersTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.rng = np.random.default_rng(0)
 
   @parameterized.named_parameters(
       dict(
@@ -71,29 +61,29 @@ class ActionAdaptersTest(parameterized.TestCase):
       delta: np.ndarray,
       expected_position: np.ndarray,
   ):
-    rng = np.random.default_rng(0)
-
-    action_adapter = action_adapters.DeltaPositionActionAdapter(rng)
+    action_adapter = action_adapters.DeltaPositionActionAdapter(self.rng)
     action_adapter.reset()
     # Manually set the beam position.
     action_adapter.beam_pos = initial_position
 
     action_adapter.get_action(
-        _EMPTY_GRID,  # Grid not used.
+        test_utils.create_graphene_observation_with_single_silicon_in_fov(
+            self.rng
+        ),  # Observation not used.
         delta,
     )
 
     np.testing.assert_allclose(action_adapter.beam_pos, expected_position)
 
   def test_delta_adapter_has_acceptable_action_spec(self):
-    rng = np.random.default_rng(0)
-
-    action_adapter = action_adapters.DeltaPositionActionAdapter(rng)
+    action_adapter = action_adapters.DeltaPositionActionAdapter(self.rng)
     action_adapter.reset()
 
     sampled_action = action_adapter.action_spec.generate_value()
     simulator_controls = action_adapter.get_action(
-        _EMPTY_GRID,  # Grid not used.
+        test_utils.create_graphene_observation_with_single_silicon_in_fov(
+            self.rng
+        ),  # Observation not used.
         sampled_action,
     )
 
@@ -102,22 +92,28 @@ class ActionAdaptersTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
       dict(
+          testcase_name='on_silicon',
+          silicon_position=np.asarray([[0.4, 0.4]]),
+          delta=np.asarray([0.0, 0.0]),
+          expected_position=np.asarray([0.4, 0.4]),
+      ),
+      dict(
           testcase_name='above_silicon',
           silicon_position=np.asarray([[0.5, 0.75]]),
-          delta=np.asarray([0.0, 0.035]),
-          expected_position=np.asarray([0.5, 0.785]),
+          delta=np.asarray([0.0, 0.2]),
+          expected_position=np.asarray([0.5, 0.7784]),
       ),
       dict(
           testcase_name='beside_silicon',
           silicon_position=np.asarray([[0.31, 0.31]]),
           delta=np.asarray([-0.1, 0.0]),
-          expected_position=np.asarray([0.21, 0.31]),
+          expected_position=np.asarray([0.2958, 0.31]),
       ),
       dict(
           testcase_name='diagonal',
           silicon_position=np.asarray([[0.92, 0.11]]),
-          delta=np.asarray([-0.02, 0.1]),
-          expected_position=np.asarray([0.9, 0.21]),
+          delta=np.asarray([-1.0, 0.75]),
+          expected_position=np.asarray([0.778, 0.2165]),
       ),
   )
   def test_relative_adapter_returns_position_relative_to_silicon(
@@ -126,17 +122,28 @@ class ActionAdaptersTest(parameterized.TestCase):
       delta: np.ndarray,
       expected_position: np.ndarray,
   ) -> None:
-    grid = _make_unit_hexagonal_grid(np.random.default_rng(0))
-    # Shift the whole grid so the silicon is in the specified position.
-    current_silicon_position = grid.atom_positions[
-        grid.atomic_numbers == constants.SILICON
-    ]
-    grid.atom_positions[:, :] += silicon_position - current_silicon_position
+    # Shift the observed grid so the silicon is in the specified position.
+    # Initially, the silicon is at (0.5, 0.5).
+    observation = (
+        test_utils.create_graphene_observation_with_single_silicon_in_fov(
+            self.rng
+        )
+    )
+    shifted_grid = microscope_utils.AtomicGrid(
+        atom_positions=observation.grid.atom_positions + silicon_position - 0.5,
+        atomic_numbers=observation.grid.atomic_numbers,
+    )
+    observation = microscope_utils.MicroscopeObservation(
+        grid=shifted_grid,
+        fov=observation.fov,
+        controls=observation.controls,
+        elapsed_time=observation.elapsed_time,
+    )
 
     action_adapter = action_adapters.RelativeToSiliconActionAdapter()
 
     simulator_controls = action_adapter.get_action(
-        grid,
+        observation,
         delta,
     )
 
@@ -146,41 +153,15 @@ class ActionAdaptersTest(parameterized.TestCase):
         np.asarray(simulator_controls[0].position), expected_position
     )
 
-  @parameterized.parameters(0.01, 0.1, 0.8, 2.0, 200.0)
-  def test_relative_adapter_adapts_to_grid_scale(
-      self,
-      grid_scale: float,
-  ) -> None:
-    grid = _make_unit_hexagonal_grid(np.random.default_rng(0))
-    # Shift the whole grid so the silicon is at the origin.
-    current_silicon_position = grid.atom_positions[
-        grid.atomic_numbers == constants.SILICON
-    ]
-    grid.atom_positions[:, :] -= current_silicon_position
-    grid.atom_positions[:, :] *= grid_scale  # Scale the grid as specified.
-
-    action_adapter = action_adapters.RelativeToSiliconActionAdapter()
-    delta = np.asarray([0.0, 1.0])
-
-    simulator_controls = action_adapter.get_action(grid, delta)
-
-    self.assertLen(simulator_controls, 1)
-    self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
-    np.testing.assert_allclose(
-        np.asarray(simulator_controls[0].position), delta * grid_scale
-    )
-
   def test_relative_adapter_has_acceptable_action_spec(self) -> None:
-    material = graphene.PristineSingleDopedGraphene(np.random.default_rng(0))
-    grid = microscope_utils.AtomicGrid(
-        material.atom_positions, material.atomic_numbers
-    )
     action_adapter = action_adapters.RelativeToSiliconActionAdapter()
     action_adapter.reset()
 
     sampled_action = action_adapter.action_spec.generate_value()
     simulator_controls = action_adapter.get_action(
-        grid,
+        test_utils.create_graphene_observation_with_single_silicon_in_fov(
+            self.rng
+        ),
         sampled_action,
     )
 

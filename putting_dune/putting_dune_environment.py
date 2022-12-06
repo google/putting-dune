@@ -123,7 +123,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # TODO(joshgreaves): Cache last probe position, and use it wherever
     # beam_position is required.
     simulator_control = self._action_adapter.get_action(
-        self._last_microscope_observation.grid, action
+        self._last_microscope_observation, action
     )
 
     # 2. Step the simulator with the action returned from ActionAdapter.

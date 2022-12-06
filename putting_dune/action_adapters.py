@@ -19,13 +19,12 @@ import abc
 import datetime as dt
 from typing import List
 
-from absl import logging
 from dm_env import specs
 import numpy as np
+from putting_dune import constants
 from putting_dune import graphene
 from putting_dune import microscope_utils
 from shapely import geometry
-from sklearn import neighbors
 
 
 class ActionAdapter(abc.ABC):
@@ -41,7 +40,7 @@ class ActionAdapter(abc.ABC):
   @abc.abstractmethod
   def get_action(
       self,
-      grid: microscope_utils.AtomicGrid,
+      previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
   ) -> List[microscope_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
@@ -68,10 +67,10 @@ class DeltaPositionActionAdapter(ActionAdapter):
 
   def get_action(
       self,
-      grid: microscope_utils.AtomicGrid,
+      previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
   ) -> List[microscope_utils.BeamControl]:
-    del grid  # Unused.
+    del previous_observation  # Unused.
 
     self.beam_pos += action
     # For now, we clip the beam to ensure it doesn't leave the field
@@ -102,11 +101,13 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
 
   def get_action(
       self,
-      grid: microscope_utils.AtomicGrid,
+      previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
   ) -> List[microscope_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
-    silicon_position = graphene.get_silicon_positions(grid)
+    action = np.clip(action, -1.0, 1.0)
+
+    silicon_position = graphene.get_silicon_positions(previous_observation.grid)
 
     if silicon_position.shape != (1, 2):
       raise RuntimeError(
@@ -114,32 +115,20 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
           f'got {silicon_position.shape[0]} silicon atoms with '
           f'{silicon_position.shape[1]} dimensions.'
       )
-
-    nearest_neighbors = neighbors.NearestNeighbors(
-        n_neighbors=4,  # Self and 3 nearest.
-        metric='l2',
-        algorithm='brute',
-    ).fit(grid.atom_positions)
-    neighbor_distances, _ = nearest_neighbors.kneighbors(silicon_position)
-    neighbor_distances = neighbor_distances.reshape(-1)
-
-    if abs(neighbor_distances[1] - neighbor_distances[3]) > 1e-3:
-      bond_distance_difference = abs(
-          neighbor_distances[1] - neighbor_distances[3]
-      )
-      logging.warning(
-          (
-              '%s is intended for pristine graphene. It expects the 1st and '
-              '3rd nearest neighbors to be roughly equidistant. '
-              'Difference was %.3f'
-          ),
-          self.__class__.__name__,
-          bond_distance_difference,
-      )
+    silicon_position = np.reshape(silicon_position, (2,))
 
     # Action is [dx, dy] in unit cell terms.
-    cell_radius = np.mean(neighbor_distances[1:])
+    # For generality, assume aspect ratio is not square.
+    fov = previous_observation.fov
+    cell_radius_x = constants.CARBON_BOND_DISTANCE_ANGSTROMS / (
+        fov.upper_right.x - fov.lower_left.x
+    )
+    cell_radius_y = constants.CARBON_BOND_DISTANCE_ANGSTROMS / (
+        fov.upper_right.y - fov.lower_left.y
+    )
+    cell_radius = np.asarray([cell_radius_x, cell_radius_y])
     control_position = silicon_position + (action * cell_radius)
+    control_position = np.clip(control_position, 0.0, 1.0)
 
     return [
         microscope_utils.BeamControl(

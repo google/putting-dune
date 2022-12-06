@@ -79,7 +79,7 @@ class MicroscopeAgent:
     action = self.agent.step(time_step)
 
     beam_control = self.env_config.action_adapter.get_action(
-        observation.grid, action
+        observation, action
     )
 
     # First step is only after immediately calling reset.
