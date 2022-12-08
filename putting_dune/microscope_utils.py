@@ -17,6 +17,7 @@
 
 import dataclasses
 import datetime as dt
+import typing
 from typing import Tuple
 
 import numpy as np
@@ -76,23 +77,81 @@ class MicroscopeFieldOfView:
   def height(self) -> float:
     return self.upper_right.y - self.lower_left.y
 
-  def microscope_grid_to_material_grid(self, grid: AtomicGrid) -> AtomicGrid:
+  @typing.overload
+  def microscope_frame_to_material_frame(self, point: np.ndarray) -> np.ndarray:
+    ...
+
+  @typing.overload
+  def microscope_frame_to_material_frame(
+      self, point: geometry.Point
+  ) -> geometry.Point:
+    ...
+
+  @typing.overload
+  def microscope_frame_to_material_frame(self, point: AtomicGrid) -> AtomicGrid:
+    ...
+
+  def microscope_frame_to_material_frame(self, point):
+    """Converts a point from microscope frame to material frame."""
     lower_left = np.asarray(self.lower_left).reshape(1, 2)
     upper_right = np.asarray(self.upper_right).reshape(1, 2)
     scale = upper_right - lower_left
 
-    return AtomicGrid(
-        grid.atom_positions * scale + lower_left, grid.atomic_numbers
-    )
+    if isinstance(point, AtomicGrid):
+      grid = typing.cast(AtomicGrid, point)
+      return AtomicGrid(
+          grid.atom_positions * scale + lower_left, grid.atomic_numbers
+      )
+    elif isinstance(point, np.ndarray):
+      point = typing.cast(np.ndarray, point)
 
-  def material_grid_to_microscope_grid(self, grid: AtomicGrid) -> AtomicGrid:
+      return_shape = (2,) if point.ndim == 1 else (-1, 2)
+      return (point.reshape(-1, 2) * scale + lower_left).reshape(return_shape)
+    elif isinstance(point, geometry.Point):
+      point = typing.cast(geometry.Point, point)
+      return geometry.Point((
+          point.x * scale[0, 0] + lower_left[0, 0],
+          point.y * scale[0, 1] + lower_left[0, 1],
+      ))
+    raise NotImplementedError(f'Point of type {type(point)} is not supported.')
+
+  @typing.overload
+  def material_frame_to_microscope_frame(self, point: np.ndarray) -> np.ndarray:
+    ...
+
+  @typing.overload
+  def material_frame_to_microscope_frame(
+      self, point: geometry.Point
+  ) -> geometry.Point:
+    ...
+
+  @typing.overload
+  def material_frame_to_microscope_frame(self, point: AtomicGrid) -> AtomicGrid:
+    ...
+
+  def material_frame_to_microscope_frame(self, point):
+    """Converts a point from material frame to microscope frame."""
     lower_left = np.asarray(self.lower_left).reshape(1, 2)
     upper_right = np.asarray(self.upper_right).reshape(1, 2)
     scale = upper_right - lower_left
 
-    return AtomicGrid(
-        (grid.atom_positions - lower_left) / scale, grid.atomic_numbers
-    )
+    if isinstance(point, AtomicGrid):
+      grid = typing.cast(AtomicGrid, point)
+      return AtomicGrid(
+          (grid.atom_positions - lower_left) / scale, grid.atomic_numbers
+      )
+    elif isinstance(point, np.ndarray):
+      point = typing.cast(np.ndarray, point)
+
+      return_shape = (2,) if point.ndim == 1 else (-1, 2)
+      return ((point.reshape(-1, 2) - lower_left) / scale).reshape(return_shape)
+    elif isinstance(point, geometry.Point):
+      point = typing.cast(geometry.Point, point)
+      return geometry.Point((
+          (point.x - lower_left[0, 0]) / scale[0, 0],
+          (point.y - lower_left[0, 1]) / scale[0, 1],
+      ))
+    raise NotImplementedError(f'Point of type {type(point)} is not supported.')
 
   def __str__(self) -> str:
     ll = self.lower_left

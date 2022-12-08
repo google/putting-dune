@@ -92,7 +92,7 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
     neighbor_distances = neighbor_distances[0, 1:].reshape(-1, 1)
     normalized_deltas = neighbor_deltas / neighbor_distances
 
-    material_frame_grid = observation.fov.microscope_grid_to_material_grid(
+    material_frame_grid = observation.fov.microscope_frame_to_material_frame(
         observation.grid
     )
     silicon_position_material_frame = graphene.get_silicon_positions(

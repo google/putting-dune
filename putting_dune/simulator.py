@@ -18,7 +18,6 @@
 import datetime as dt
 from typing import Sequence
 
-import numpy as np
 from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
@@ -104,7 +103,9 @@ class PuttingDuneSimulator:
     for control in controls:
       # Convert the control from the microscope frame to material frame.
       # TODO(joshgreaves): Control clipping to [0, 1]?
-      control_position = self.convert_point_to_material_frame(control.position)
+      control_position = self._fov.microscope_frame_to_material_frame(
+          control.position
+      )
       control = microscope_utils.BeamControl(
           control_position, control.dwell_time
       )
@@ -152,32 +153,6 @@ class PuttingDuneSimulator:
       self, observer: microscope_utils.SimulatorObserver
   ) -> None:
     self._observers.remove(observer)
-
-  def convert_point_to_material_frame(
-      self,
-      point: geometry.Point,
-  ) -> geometry.Point:
-    """Converts a point from microscope frame to material frame."""
-    # We make a fake atomic grid with just the control to benefit from
-    # the code that transforms grids.
-    grid = microscope_utils.AtomicGrid(
-        np.asarray(point).reshape(1, 2), np.zeros(1)
-    )
-    grid = self._fov.microscope_grid_to_material_grid(grid)
-    return geometry.Point(grid.atom_positions.reshape(-1))
-
-  def convert_point_to_microscope_frame(
-      self,
-      point: geometry.Point,
-  ) -> geometry.Point:
-    """Converts a point from material frame to microscope frame."""
-    # We make a fake atomic grid with just the control to benefit from
-    # the code that transforms grids.
-    grid = microscope_utils.AtomicGrid(
-        np.asarray(point).reshape(1, 2), np.zeros(1)
-    )
-    grid = self._fov.material_grid_to_microscope_grid(grid)
-    return geometry.Point(grid.atom_positions.reshape(-1))
 
   def _image_material(self) -> microscope_utils.AtomicGrid:
     """Images the material and returns the observation."""

@@ -174,10 +174,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
     goal_position = None
     if isinstance(self.goal, goals.SingleSiliconGoalReaching):
       goal = typing.cast(goals.SingleSiliconGoalReaching, self.goal)
-      goal_position = np.asarray(
-          self.sim.convert_point_to_microscope_frame(
-              geometry.Point(goal.goal_position_material_frame)
-          )
+      fov = self._last_microscope_observation.fov
+      goal_position = fov.material_frame_to_microscope_frame(
+          goal.goal_position_material_frame
       )
 
     plotting_utils.plot_microscope_frame(

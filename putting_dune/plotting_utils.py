@@ -170,14 +170,16 @@ def generate_video_from_simulator_events(
     )
 
     # Convert items to microscope frame.
-    microscope_grid = args['fov'].material_grid_to_microscope_grid(args['grid'])
+    microscope_grid = args['fov'].material_frame_to_microscope_frame(
+        args['grid']
+    )
     # We make a grid containing just the goal and control to make it easy
     # to convert them to the microscope frame.
     material_frame_data = microscope_utils.AtomicGrid(
         atom_positions=np.stack([goal_position, args['control_position']]),
         atomic_numbers=np.asarray(()),  # Unused.
     )
-    microscope_frame_data = args['fov'].material_grid_to_microscope_grid(
+    microscope_frame_data = args['fov'].material_frame_to_microscope_frame(
         material_frame_data
     )
     plot_microscope_frame(

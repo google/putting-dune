@@ -115,13 +115,10 @@ class SingleSiliconGoalReaching(Goal):
     goal_idx = rng.choice(num_goals)
     goal_position = valid_goals[goal_idx]
 
-    goal_grid = microscope_utils.AtomicGrid(
-        goal_position, np.asarray([constants.CARBON])
-    )
     self.goal_position_material_frame = (
-        initial_observation.fov.microscope_grid_to_material_grid(
-            goal_grid
-        ).atom_positions[0, :]
+        initial_observation.fov.microscope_frame_to_material_frame(
+            goal_position
+        )
     )
     self._consecutive_goal_steps = 0
 
@@ -145,7 +142,7 @@ class SingleSiliconGoalReaching(Goal):
         the material and we can no longer simulate.
     """
     # Calculate the reward.
-    material_frame_grid = observation.fov.microscope_grid_to_material_grid(
+    material_frame_grid = observation.fov.microscope_frame_to_material_frame(
         observation.grid
     )
     silicon_positions = graphene.get_silicon_positions(material_frame_grid)

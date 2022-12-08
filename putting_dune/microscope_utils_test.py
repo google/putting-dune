@@ -86,7 +86,67 @@ class SimulatorUtilsTest(absltest.TestCase):
 
     self.assertEqual(fov_str, 'FOV [(0.13, -5.70), (1.23, 8.00)]')
 
-  # TODO(joshgreaves): Write tests for FOV coordinate calculations.
+  def test_fov_converts_grid_frames_of_reference(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((-5.0, 0.0)),
+        upper_right=geometry.Point((5.0, 20.0)),
+    )
+    grid_before = microscope_utils.AtomicGrid(
+        atom_positions=np.asarray([[0.5, 1.0], [-3.0, 2.5]]),
+        atomic_numbers=np.zeros(2),  # Unimportant.
+    )
+
+    material_grid = fov.microscope_frame_to_material_frame(grid_before)
+    microscope_grid = fov.material_frame_to_microscope_frame(material_grid)
+
+    with self.subTest('microscope_to_material'):
+      self.assertIsInstance(material_grid, microscope_utils.AtomicGrid)
+      np.testing.assert_allclose(
+          material_grid.atom_positions, np.asarray([[0.0, 20.0], [-35.0, 50.0]])
+      )
+    with self.subTest('material_to_microscope'):
+      self.assertIsInstance(microscope_grid, microscope_utils.AtomicGrid)
+      np.testing.assert_allclose(
+          microscope_grid.atom_positions, grid_before.atom_positions
+      )
+
+  def test_fov_converts_ndarray_frames_of_reference(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((-5.0, 0.0)),
+        upper_right=geometry.Point((5.0, 20.0)),
+    )
+    points = np.asarray([[0.5, 1.0], [-3.0, 2.5]])
+
+    material_points = fov.microscope_frame_to_material_frame(points)
+    microscope_points = fov.material_frame_to_microscope_frame(material_points)
+
+    with self.subTest('microscope_to_material'):
+      self.assertIsInstance(material_points, np.ndarray)
+      np.testing.assert_allclose(
+          material_points, np.asarray([[0.0, 20.0], [-35.0, 50.0]])
+      )
+    with self.subTest('material_to_microscope'):
+      self.assertIsInstance(microscope_points, np.ndarray)
+      np.testing.assert_allclose(microscope_points, points)
+
+  def test_fov_converts_point_frames_of_reference(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((-5.0, 0.0)),
+        upper_right=geometry.Point((5.0, 20.0)),
+    )
+    point = geometry.Point((0.5, 1.0))
+
+    material_point = fov.microscope_frame_to_material_frame(point)
+    microscope_point = fov.material_frame_to_microscope_frame(material_point)
+
+    with self.subTest('microscope_to_material'):
+      self.assertIsInstance(material_point, geometry.Point)
+      self.assertAlmostEqual(material_point.x, 0.0)
+      self.assertAlmostEqual(material_point.y, 20.0)
+    with self.subTest('material_to_microscope'):
+      self.assertIsInstance(microscope_point, geometry.Point)
+      self.assertAlmostEqual(microscope_point.x, point.x)
+      self.assertAlmostEqual(microscope_point.y, point.y)
 
 
 
