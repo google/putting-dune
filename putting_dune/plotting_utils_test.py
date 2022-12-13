@@ -22,14 +22,14 @@ from matplotlib import animation
 import numpy as np
 from putting_dune import agent_lib
 from putting_dune import plotting_utils
-from putting_dune import run_helpers
 from putting_dune import simulator_observers
+from putting_dune import test_utils
 
 
 def _generate_events_with_random_policy() -> (
     List[simulator_observers.SimulatorEvent]
 ):
-  env = run_helpers.create_putting_dune_env(seed=0, step_limit=5)
+  env = test_utils.create_simple_environment(step_limit=5)
   rng = np.random.default_rng(0)
 
   action_spec = env.action_spec()

@@ -25,8 +25,8 @@ from absl import logging
 from etils import eapp
 import numpy as np
 from putting_dune import eval_lib
-from putting_dune import experiment_registry
 from putting_dune import run_helpers
+from putting_dune.experiments import registry
 
 
 @dataclasses.dataclass
@@ -41,15 +41,18 @@ class Args:
 def main(args: Args) -> None:
   # TODO(joshgreaves): Pass seed in for agent.
   rng = np.random.default_rng(0)
-  experiment = experiment_registry.create_experiment(args.experiment_name, rng)
-  agent = experiment.agent
+  experiment = registry.create_eval_experiment(args.experiment_name)
+
+  adapters_and_goal = experiment.get_adapters_and_goal()
+  agent = experiment.get_agent(rng, adapters_and_goal)
 
   # Set up the environment.
   # Note: We pass in an arbitrary seed here, since evaluate will
   # pass in a specific seed for each episode.
   env = run_helpers.create_putting_dune_env(
       seed=0,
-      env_config_factory=(lambda: experiment.env_config),
+      get_adapters_and_goal=experiment.get_adapters_and_goal,
+      get_simulator_config=experiment.get_simulator_config,
   )
 
   # Set up the eval suite.

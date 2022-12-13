@@ -19,11 +19,11 @@ from unittest import mock
 
 from absl.testing import absltest
 import numpy as np
-from putting_dune import experiment_registry
 from putting_dune import microscope_agent
 from putting_dune import microscope_utils
-from putting_dune import putting_dune_environment
 from putting_dune import test_utils
+from putting_dune.experiments import experiments
+from putting_dune.experiments import registry
 
 
 class MicroscopeAgentTest(absltest.TestCase):
@@ -34,24 +34,31 @@ class MicroscopeAgentTest(absltest.TestCase):
     # Create a mock experiment.
     # This is more verbose than I would like, but it helps with the
     # type checker noticing we have mocks.
-    experiment = experiment_registry.create_experiment('relative_random', rng)
-    mock_agent = mock.create_autospec(experiment.agent, spec_set=True)
+    experiment = registry.create_microscope_experiment('relative_random')
+    adapters_and_goal = experiment.get_adapters_and_goal()
+    agent = experiment.get_agent(rng, adapters_and_goal)
+
+    mock_agent = mock.create_autospec(agent, spec_set=True)
     mock_action_adapter = mock.create_autospec(
-        experiment.env_config.action_adapter, spec_set=True
+        adapters_and_goal.action_adapter, spec_set=True
     )
     mock_feature_constructor = mock.create_autospec(
-        experiment.env_config.feature_constructor, spec_set=True
+        adapters_and_goal.feature_constructor, spec_set=True
     )
-    mock_goal = mock.create_autospec(experiment.env_config.goal, spec_set=True)
-    mock_experiment = experiment_registry.Experiment(
-        agent=mock_agent,
-        env_config=putting_dune_environment.EnvironmentConfiguration(
-            action_adapter=mock_action_adapter,
-            feature_constructor=mock_feature_constructor,
-            goal=mock_goal,
-        ),
+    mock_goal = mock.create_autospec(adapters_and_goal.goal, spec_set=True)
+
+    def get_mock_adapters_and_goal() -> experiments.AdaptersAndGoal:
+      return experiments.AdaptersAndGoal(
+          action_adapter=mock_action_adapter,
+          feature_constructor=mock_feature_constructor,
+          goal=mock_goal,
+      )
+
+    mock_experiment = experiments.MicroscopeExperiment(
+        get_agent=lambda _rng, _adapters: mock_agent,
+        get_adapters_and_goal=get_mock_adapters_and_goal,
     )
-    agent = microscope_agent.MicroscopeAgent(mock_experiment)
+    agent = microscope_agent.MicroscopeAgent(rng, mock_experiment)
 
     agent.reset(
         rng,
@@ -65,12 +72,12 @@ class MicroscopeAgentTest(absltest.TestCase):
 
   def test_microscope_agent_steps_correctly(self):
     rng = np.random.default_rng(0)
-    experiment = experiment_registry.create_experiment('relative_random', rng)
+    experiment = registry.create_microscope_experiment('relative_random')
     observation = (
         test_utils.create_graphene_observation_with_single_silicon_in_fov(rng)
     )
 
-    agent = microscope_agent.MicroscopeAgent(experiment)
+    agent = microscope_agent.MicroscopeAgent(rng, experiment)
     agent.reset(rng, observation)
 
     controls = agent.step(observation)

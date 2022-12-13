@@ -16,18 +16,37 @@
 """Common utility functions for unit tests."""
 
 import datetime as dt
+from typing import Any
 
 import numpy as np
 from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
+from putting_dune import putting_dune_environment
+from putting_dune import run_helpers
+from putting_dune.experiments import registry
+
+
+def create_simple_environment(
+    seed: int = 0,
+    **kwargs: Any,
+) -> putting_dune_environment.PuttingDuneEnvironment:
+  experiment = registry.create_train_experiment('relative_simple_rates')
+  return run_helpers.create_putting_dune_env(
+      seed,
+      get_adapters_and_goal=experiment.get_adapters_and_goal,
+      get_simulator_config=experiment.get_simulator_config,
+      **kwargs,
+  )
 
 
 def create_graphene_observation_with_single_silicon_in_fov(
     rng: np.random.Generator,
 ) -> microscope_utils.MicroscopeObservation:
   """Creates an observation of graphene with single silicon for unit tests."""
-  graphene_sheet = graphene.PristineSingleDopedGraphene(rng)
+  graphene_sheet = graphene.PristineSingleDopedGraphene()
+  graphene_sheet.reset(rng)
+
   silicon_position = graphene_sheet.get_silicon_position()
   fov = microscope_utils.MicroscopeFieldOfView(
       geometry.Point((silicon_position[0] - 5.0, silicon_position[1] - 5.0)),

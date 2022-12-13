@@ -55,7 +55,7 @@ class SimulatorTest(parameterized.TestCase):
   def setUp(self):
     super().setUp()
     self._rng = np.random.default_rng(0)
-    self._material = graphene.PristineSingleDopedGraphene(self._rng)
+    self._material = graphene.PristineSingleDopedGraphene()
 
   @parameterized.named_parameters(
       dict(
@@ -81,7 +81,7 @@ class SimulatorTest(parameterized.TestCase):
       predicted_control_position: geometry.Point,
   ) -> None:
     sim = simulator.PuttingDuneSimulator(self._material)
-    sim.reset()
+    sim.reset(self._rng)
     sim._fov = microscope_utils.MicroscopeFieldOfView(
         fov_lower_left, fov_upper_right
     )
@@ -91,11 +91,11 @@ class SimulatorTest(parameterized.TestCase):
     control = microscope_utils.BeamControl(
         control_position, dt.timedelta(seconds=1.5)
     )
-    sim.step_and_image([control])
+    sim.step_and_image(self._rng, [control])
 
     # Check that the probe position was the specified location for each
     # rate calculation.
-    passed_probe_control = sim.material.apply_control.call_args[0][0]
+    passed_probe_control = sim.material.apply_control.call_args[0][1]
     self.assertEqual(sim.material.apply_control.call_count, 1)
     np.testing.assert_allclose(
         np.asarray(passed_probe_control.position),
@@ -104,7 +104,7 @@ class SimulatorTest(parameterized.TestCase):
 
   def test_simulator_step_takes_multiple_probe_positions(self):
     sim = simulator.PuttingDuneSimulator(self._material)
-    sim.reset()
+    sim.reset(self._rng)
     # Mock the material to inspect calls to it.
     sim.material = _get_mock_material(sim.material, sim._fov)
 
@@ -116,7 +116,7 @@ class SimulatorTest(parameterized.TestCase):
             geometry.Point(0.6, 0.8), dt.timedelta(seconds=1.0)
         ),
     ]
-    sim.step_and_image(controls)
+    sim.step_and_image(self._rng, controls)
 
     self.assertEqual(sim.material.apply_control.call_count, 2)
 
@@ -127,9 +127,9 @@ class SimulatorTest(parameterized.TestCase):
         for x in time_per_control
     ]
     sim = simulator.PuttingDuneSimulator(self._material)
-    sim.reset()
+    sim.reset(self._rng)
 
-    sim.step_and_image(controls)
+    sim.step_and_image(self._rng, controls)
 
     # Time of controls + 2 images, generated on reset and after the first step.
     predicted_elapsed_time = sum(time_per_control, start=dt.timedelta())
@@ -140,11 +140,12 @@ class SimulatorTest(parameterized.TestCase):
   def test_simulator_behaves_deterministically_with_seeded_components(self):
     observations = []
     for _ in range(2):
-      material = graphene.PristineSingleDopedGraphene(np.random.default_rng(0))
+      rng = np.random.default_rng(0)
+      material = graphene.PristineSingleDopedGraphene()
       sim = simulator.PuttingDuneSimulator(material)
-      sim.reset()
+      sim.reset(rng)
 
-      observations.append(sim.step_and_image([_ARBITRARY_CONTROL]))
+      observations.append(sim.step_and_image(rng, [_ARBITRARY_CONTROL]))
 
     np.testing.assert_allclose(
         observations[0].grid.atom_positions, observations[1].grid.atom_positions
@@ -160,30 +161,28 @@ class SimulatorTest(parameterized.TestCase):
 
   def test_simulator_reset_correctly_resets_state(self):
     sim = simulator.PuttingDuneSimulator(self._material)
-    sim.reset()
+    sim.reset(self._rng)
 
-    sim.step_and_image([_ARBITRARY_CONTROL])
+    sim.step_and_image(self._rng, [_ARBITRARY_CONTROL])
 
     elapsed_time_before_reset = sim.elapsed_time
     atom_positions_before_reset = np.copy(sim.material.atom_positions)
-    atomic_numbers_before_reset = np.copy(sim.material.atomic_numbers)
 
-    sim.reset()
+    sim.reset(self._rng)
 
     elapsed_time_after_reset = sim.elapsed_time
     atom_positions_after_reset = np.copy(sim.material.atom_positions)
-    atomic_numbers_after_reset = np.copy(sim.material.atomic_numbers)
 
     # Check elapsed time was reset correctly.
     self.assertNotEqual(elapsed_time_after_reset, elapsed_time_before_reset)
     self.assertEqual(elapsed_time_after_reset, sim._image_duration)
 
     # Check the material was reinitialized.
+    # Note: We do not compare atomic numbers, since there is a pretty good
+    # chance that the silicon atom is at the same index, since the silicon
+    # is always initialized at the center of the grid.
     self.assertTrue(
         (atom_positions_before_reset != atom_positions_after_reset).any()
-    )
-    self.assertTrue(
-        (atomic_numbers_before_reset != atomic_numbers_after_reset).any()
     )
 
   def test_simulator_calls_observers_correctly(self):
@@ -191,13 +190,13 @@ class SimulatorTest(parameterized.TestCase):
 
     sim = simulator.PuttingDuneSimulator(self._material, observers=(observer,))
 
-    obs = sim.reset()
+    obs = sim.reset(self._rng)
 
     # Position control near the silicon to trigger an event.
     # We can reuse the relative action adapter to make things easier.
     action_adapter = action_adapters.RelativeToSiliconActionAdapter()
     controls = action_adapter.get_action(obs, np.asarray([0.5, 0.5]))
-    sim.step_and_image(controls)
+    sim.step_and_image(self._rng, controls)
 
     events = observer.events
     # Expected events: reset, image, action, (many) transition(s), image.
@@ -248,7 +247,7 @@ class SimulatorTest(parameterized.TestCase):
     sim = simulator.PuttingDuneSimulator(
         self._material, observers=(event_observer,)
     )
-    sim.reset()
+    sim.reset(self._rng)
 
     # Manually move the field of view so that the silicon is near the edge.
     silicon_position = sim.material.get_silicon_position()
@@ -262,11 +261,12 @@ class SimulatorTest(parameterized.TestCase):
 
     # Apply a control for 0 seconds to ensure the silicon doesn't move.
     obs = sim.step_and_image(
+        self._rng,
         [
             microscope_utils.BeamControl(
                 geometry.Point((1.0, 1.0)), dt.timedelta(seconds=0.0)
             )
-        ]
+        ],
     )
 
     # Check the returned observation is correct.

@@ -19,8 +19,8 @@ from typing import List
 
 import dm_env
 import numpy as np
-from putting_dune import experiment_registry
 from putting_dune import microscope_utils
+from putting_dune.experiments import experiments
 
 
 class MicroscopeAgent:
@@ -28,10 +28,14 @@ class MicroscopeAgent:
 
   def __init__(
       self,
-      experiment=experiment_registry.Experiment,
+      rng: np.random.Generator,
+      experiment: experiments.MicroscopeExperiment,
   ):
-    self.agent = experiment.agent
-    self.env_config = experiment.env_config
+    adapters_and_goal = experiment.get_adapters_and_goal()
+    self.agent = experiment.get_agent(rng, adapters_and_goal)
+    self.action_adapter = adapters_and_goal.action_adapter
+    self.feature_constructor = adapters_and_goal.feature_constructor
+    self.goal = adapters_and_goal.goal
     self._is_first_step = True
 
   def reset(
@@ -40,9 +44,9 @@ class MicroscopeAgent:
       observation: microscope_utils.MicroscopeObservation,
   ) -> None:
     """Resets the agent."""
-    self.env_config.feature_constructor.reset()
-    self.env_config.goal.reset(rng, observation)
-    self.env_config.action_adapter.reset()
+    self.feature_constructor.reset()
+    self.goal.reset(rng, observation)
+    self.action_adapter.reset()
 
     self._is_first_step = True
 
@@ -51,12 +55,8 @@ class MicroscopeAgent:
       observation: microscope_utils.MicroscopeObservation,
   ) -> List[microscope_utils.BeamControl]:
     """Steps the agent."""
-    features = self.env_config.feature_constructor.get_features(
-        observation, self.env_config.goal
-    )
-    goal_return = self.env_config.goal.calculate_reward_and_terminal(
-        observation
-    )
+    features = self.feature_constructor.get_features(observation, self.goal)
+    goal_return = self.goal.calculate_reward_and_terminal(observation)
 
     # TODO(joshgreaves): What discount to use?
     discount = 0.99
@@ -78,9 +78,7 @@ class MicroscopeAgent:
 
     action = self.agent.step(time_step)
 
-    beam_control = self.env_config.action_adapter.get_action(
-        observation, action
-    )
+    beam_control = self.action_adapter.get_action(observation, action)
 
     # First step is only after immediately calling reset.
     self._is_first_step = False

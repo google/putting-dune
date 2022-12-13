@@ -16,47 +16,34 @@
 """Shared helpers for RL experiments."""
 
 import typing
-from typing import Callable, Sequence
+from typing import Sequence
 
 from acme import wrappers
 from acme.utils.google import experiment_utils
-from putting_dune import action_adapters
-from putting_dune import feature_constructors
-from putting_dune import goals
 from putting_dune import microscope_utils
 from putting_dune import putting_dune_environment
+from putting_dune.experiments import experiments
 
 make_logger = experiment_utils.make_experiment_logger
-
-
-def _default_env_config_factory() -> (
-    putting_dune_environment.EnvironmentConfiguration
-):
-  return putting_dune_environment.EnvironmentConfiguration(
-      action_adapter=action_adapters.RelativeToSiliconActionAdapter(),
-      feature_constructor=(
-          feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor()
-      ),
-      goal=goals.SingleSiliconGoalReaching(),
-  )
 
 
 def create_putting_dune_env(
     seed: int,
     *,
-    env_config_factory: Callable[
-        [], putting_dune_environment.EnvironmentConfiguration
-    ] = _default_env_config_factory,
+    get_adapters_and_goal: experiments.AdaptersAndGoalConstructor,
+    get_simulator_config: experiments.SimulatorConfigConstructor,
     simulator_observers: Sequence[microscope_utils.SimulatorObserver] = (),
     # 30 minutes, based on current exposure/image capturing times.
     step_limit: int = 600,
 ) -> putting_dune_environment.PuttingDuneEnvironment:
   """Creates Putting Dune environment for RL experiments."""
-  env_config = env_config_factory()
+  adapters_and_goal = get_adapters_and_goal()
+  simulator_config = get_simulator_config()
   env = putting_dune_environment.PuttingDuneEnvironment(
-      action_adapter=env_config.action_adapter,
-      feature_constructor=env_config.feature_constructor,
-      goal=env_config.goal,
+      material=simulator_config.material,
+      action_adapter=adapters_and_goal.action_adapter,
+      feature_constructor=adapters_and_goal.feature_constructor,
+      goal=adapters_and_goal.goal,
   )
   env = wrappers.SinglePrecisionWrapper(env)
   env = wrappers.StepLimitWrapper(env, step_limit=step_limit)

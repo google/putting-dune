@@ -38,7 +38,8 @@ class GrapheneTest(absltest.TestCase):
     self.rng = np.random.default_rng(0)
 
   def test_atoms_in_graphene_are_a_fixed_distance_apart(self):
-    material = graphene.PristineSingleDopedGraphene(self.rng)
+    material = graphene.PristineSingleDopedGraphene()
+    material.reset(self.rng)
 
     num_atoms = material.atom_positions.shape[0]
     chosen_idx = self.rng.choice(num_atoms)
@@ -62,8 +63,10 @@ class GrapheneTest(absltest.TestCase):
   def test_different_seeds_give_different_orientations_of_graphene(self):
     rng1 = np.random.default_rng(1)
     rng2 = np.random.default_rng(2)
-    material1 = graphene.PristineSingleDopedGraphene(rng1)
-    material2 = graphene.PristineSingleDopedGraphene(rng2)
+    material1 = graphene.PristineSingleDopedGraphene()
+    material2 = graphene.PristineSingleDopedGraphene()
+    material1.reset(rng1)
+    material2.reset(rng2)
 
     # Pick an atom at random from both sheets.
     num_atoms1 = material1.atom_positions.shape[0]
@@ -104,13 +107,15 @@ class GrapheneTest(absltest.TestCase):
     self.assertNotAlmostEqual(angle1, angle2)
 
   def test_graphene_only_contains_a_single_dopant(self):
-    material = graphene.PristineSingleDopedGraphene(self.rng)
+    material = graphene.PristineSingleDopedGraphene()
+    material.reset(self.rng)
 
     num_silicon = np.sum(material.atomic_numbers == constants.SILICON)
     self.assertEqual(num_silicon, 1)
 
   def test_get_atoms_in_bounds_gets_correct_atoms(self):
-    material = graphene.PristineSingleDopedGraphene(self.rng)
+    material = graphene.PristineSingleDopedGraphene()
+    material.reset(self.rng)
 
     lower_left = geometry.Point((0.0, 0.0))
     upper_right = geometry.Point((
@@ -137,7 +142,8 @@ class GrapheneTest(absltest.TestCase):
       )
 
   def test_get_atoms_in_bounds_correctly_normalizes_points_in_unit_square(self):
-    material = graphene.PristineSingleDopedGraphene(self.rng)
+    material = graphene.PristineSingleDopedGraphene()
+    material.reset(self.rng)
 
     lower_left = geometry.Point((-10.0, -10.0))
     upper_right = geometry.Point((
@@ -157,14 +163,13 @@ class GrapheneTest(absltest.TestCase):
       return_value=np.full((3,), 5.0, dtype=np.float32),
   )
   def test_graphene_transitions_without_affecting_structure(self, mock_rate_fn):
-    material = graphene.PristineSingleDopedGraphene(
-        self.rng, predict_rates=mock_rate_fn
-    )
+    material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
+    material.reset(self.rng)
 
     atom_positions_before = np.copy(material.atom_positions)
     atomic_numbers_before = np.copy(material.atomic_numbers)
 
-    material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
+    material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
     atom_positions_after = np.copy(material.atom_positions)
     atomic_numbers_after = np.copy(material.atomic_numbers)
 
@@ -185,10 +190,9 @@ class GrapheneTest(absltest.TestCase):
   def test_simulator_allows_multiple_transitions_when_rates_are_high(
       self, mock_rate_fn
   ):
-    material = graphene.PristineSingleDopedGraphene(
-        self.rng, predict_rates=mock_rate_fn
-    )
-    material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
+    material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
+    material.reset(self.rng)
+    material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
 
     self.assertGreater(mock_rate_fn.call_count, 1)
 
@@ -200,20 +204,18 @@ class GrapheneTest(absltest.TestCase):
       with mock.patch.object(graphene, 'simple_transition_rates') as rate_fn:
         # About 0.3 events should occur per second on average.
         rate_fn.return_value = np.full((3,), 0.1, dtype=np.float32)
-        material = graphene.PristineSingleDopedGraphene(
-            self.rng, predict_rates=rate_fn
-        )
-        material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
+        material = graphene.PristineSingleDopedGraphene(predict_rates=rate_fn)
+        material.reset(self.rng)
+        material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
         low_rate_transitions = rate_fn.call_count
 
       # Get the number of transitions with a low rate.
       with mock.patch.object(graphene, 'simple_transition_rates') as rate_fn:
         # About 6 events should occur per second on average.
         rate_fn.return_value = np.full((3,), 2.0, dtype=np.float32)
-        material = graphene.PristineSingleDopedGraphene(
-            self.rng, predict_rates=rate_fn
-        )
-        material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
+        material = graphene.PristineSingleDopedGraphene(predict_rates=rate_fn)
+        material.reset(self.rng)
+        material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
         high_rate_transitions = rate_fn.call_count
 
       high_rate_transitioned_more_than_low_rate.append(
@@ -228,11 +230,11 @@ class GrapheneTest(absltest.TestCase):
     # This simply tests that the silicon isn't initialized right on the edge.
     # In fact, we should test that it isn't initialized _close_ to and edge,
     # but we will skim over this for now 🤷‍♂️.
-    material = graphene.PristineSingleDopedGraphene(self.rng, grid_columns=10)
+    material = graphene.PristineSingleDopedGraphene(grid_columns=10)
 
     # Reset many times to check each initialization is not near an edge.
     for _ in range(100):
-      material.reset()
+      material.reset(self.rng)
 
       neighbor_distances, _ = material.nearest_neighbors.kneighbors(
           material.get_silicon_position().reshape(1, 2)
@@ -243,13 +245,13 @@ class GrapheneTest(absltest.TestCase):
       )
 
   def test_human_prior_rates(self):
-    rng = np.random.default_rng(0)
     transition_model = graphene.HumanPriorRatePredictor()
     material = graphene.PristineSingleDopedGraphene(
-        rng, predict_rates=transition_model.predict
+        predict_rates=transition_model.predict
     )
+    material.reset(self.rng)
 
-    material.apply_control(_ARBITRARY_CONTROL, _ARBITRARY_TIME)
+    material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
 
 
 if __name__ == '__main__':

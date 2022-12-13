@@ -18,6 +18,7 @@
 import datetime as dt
 from typing import Sequence
 
+import numpy as np
 from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
@@ -52,21 +53,21 @@ class PuttingDuneSimulator:
 
     # TODO(joshgreaves): Tune this to match the real image duration time.
     self._image_duration = dt.timedelta(seconds=1.5)
-    self.elapsed_time = dt.timedelta(seconds=0)
+
+    # Will be instantiated on reset.
+    self._has_been_reset = False
+    self._fov: microscope_utils.MicroscopeFieldOfView
+    self.elapsed_time: dt.timedelta
+
+  def reset(
+      self, rng: np.random.Generator
+  ) -> microscope_utils.MicroscopeObservation:
+    """Reset to a plausible simulator state."""
+    self._has_been_reset = True
+    # Re-initialize the material.
+    self.material.reset(rng)
 
     # TODO(joshgreaves): Maybe add noise to fov initialization.
-    # Initiate the fov with at least one silicon inside it.
-    silicon_position = self.material.get_silicon_position()
-    self._fov = microscope_utils.MicroscopeFieldOfView(
-        geometry.Point(silicon_position - 10),
-        geometry.Point(silicon_position + 10),
-    )
-
-  def reset(self) -> microscope_utils.MicroscopeObservation:
-    """Reset to a plausible simulator state."""
-    # Re-initialize the material.
-    self.material.reset()
-
     # Initiate the fov with the silicon inside it.
     silicon_position = self.material.get_silicon_position()
     self._fov = microscope_utils.MicroscopeFieldOfView(
@@ -86,6 +87,7 @@ class PuttingDuneSimulator:
 
   def step_and_image(
       self,
+      rng: np.random.Generator,
       controls: Sequence[microscope_utils.BeamControl],
   ) -> microscope_utils.MicroscopeObservation:
     """Update simulator state based on beam position delta.
@@ -94,12 +96,17 @@ class PuttingDuneSimulator:
     of actions and then generate an image.
 
     Arguments:
+      rng: The RNG to use during the stepping/imaging phase.
       controls: An iterable of controls to apply. This expects an iterable since
         we may want to accept a sequence of controls between generating images.
 
     Returns:
       An observation from the simulator.
+
+    Raises:
+      RuntimeError: If called before reset.
     """
+    self._assert_has_been_reset('step_and_image')
     for control in controls:
       # Convert the control from the microscope frame to material frame.
       # TODO(joshgreaves): Control clipping to [0, 1]?
@@ -113,7 +120,9 @@ class PuttingDuneSimulator:
       for observer in self._observers:
         observer.observe_apply_control(self.elapsed_time, control)
 
-      self.material.apply_control(control, self.elapsed_time, self._observers)
+      self.material.apply_control(
+          rng, control, self.elapsed_time, self._observers
+      )
 
       self.elapsed_time += control.dwell_time
 
@@ -174,3 +183,9 @@ class PuttingDuneSimulator:
     self.elapsed_time += self._image_duration
 
     return observation
+
+  def _assert_has_been_reset(self, fn_name: str) -> None:
+    if not self._has_been_reset:
+      raise RuntimeError(
+          f'Must call reset on {self.__class__} before {fn_name}.'
+      )

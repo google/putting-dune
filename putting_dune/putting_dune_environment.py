@@ -15,9 +15,7 @@
 # pyformat: mode=pyink
 """Putting Dune Environment for use with RL agents."""
 
-import dataclasses
 import datetime as dt
-import enum
 import typing
 from typing import Optional
 
@@ -35,23 +33,12 @@ from putting_dune import plotting_utils
 from putting_dune import simulator
 
 
-class RatePredictorType(str, enum.Enum):
-  PRIOR = 'prior'
-  SIMPLE = 'simple'
-
-
-@dataclasses.dataclass(frozen=True)
-class EnvironmentConfiguration:
-  action_adapter: action_adapters.ActionAdapter
-  feature_constructor: feature_constructors.FeatureConstructor
-  goal: goals.Goal
-
-
 class PuttingDuneEnvironment(dm_env.Environment):
   """Putting Dune Environment."""
 
   def __init__(
       self,
+      material: graphene.Material,
       action_adapter: action_adapters.ActionAdapter,
       feature_constructor: feature_constructors.FeatureConstructor,
       goal: goals.Goal,
@@ -59,10 +46,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
-    rate_predictor = graphene.HumanPriorRatePredictor()
-    self._material = graphene.PristineSingleDopedGraphene(
-        self._rng, predict_rates=rate_predictor.predict
-    )
+    self._material = material
     self.sim = simulator.PuttingDuneSimulator(self._material)
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapter
@@ -91,7 +75,6 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     # Replace the rng in child objects.
     # TODO(joshgreaves): This isn't robust to changes deeper in the stack.
-    self._material.rng = self._rng
     if hasattr(self._action_adapter, 'rng'):
       self._action_adapter.rng = self._rng
 
@@ -100,7 +83,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._requires_reset = False
 
     # Generate a realistic doped graphene configuration.
-    self._last_microscope_observation = self.sim.reset()
+    self._last_microscope_observation = self.sim.reset(self._rng)
     self._action_adapter.reset()
     self._feature_constructor.reset()
     self.goal.reset(self._rng, self._last_microscope_observation)
@@ -122,13 +105,13 @@ class PuttingDuneEnvironment(dm_env.Environment):
     #    This allows us to experiment with different action spaces.
     # TODO(joshgreaves): Cache last probe position, and use it wherever
     # beam_position is required.
-    simulator_control = self._action_adapter.get_action(
+    simulator_controls = self._action_adapter.get_action(
         self._last_microscope_observation, action
     )
 
     # 2. Step the simulator with the action returned from ActionAdapter.
     self._last_microscope_observation = self.sim.step_and_image(
-        simulator_control
+        self._rng, simulator_controls
     )
 
     # 3. Create an observation with ObservationConstructor, using

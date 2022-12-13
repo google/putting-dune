@@ -25,7 +25,7 @@ import numpy as np
 from putting_dune import agent_lib
 from putting_dune import eval_lib
 from putting_dune import putting_dune_environment
-from putting_dune import run_helpers
+from putting_dune import test_utils
 
 
 _TERMINAL_STEP = dm_env.termination(0.0, None)
@@ -61,7 +61,7 @@ class EvalLibTest(absltest.TestCase):
     self.assertEqual(self._mock_environment.step.call_count, num_seeds)
 
   def test_eval_lib_generates_video_when_path_is_specified(self):
-    env = run_helpers.create_putting_dune_env(seed=0, step_limit=5)
+    env = test_utils.create_simple_environment(step_limit=5)
     rng = np.random.default_rng(0)
 
     action_spec = env.action_spec()

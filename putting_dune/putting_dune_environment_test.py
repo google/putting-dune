@@ -21,7 +21,7 @@ from absl.testing import absltest
 import dm_env
 import numpy as np
 from putting_dune import goals
-from putting_dune import run_helpers
+from putting_dune import test_utils
 
 
 # These actions are for the DeltaPositionActionAdapter.
@@ -43,8 +43,7 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    # We use the environment created from run_helpers for convenience.
-    self.env = run_helpers.create_putting_dune_env(0)
+    self.env = test_utils.create_simple_environment()
     self.env.seed(0)
 
   def test_environment_is_initialized_correctly(self):

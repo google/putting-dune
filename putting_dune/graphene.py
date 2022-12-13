@@ -156,12 +156,13 @@ class Material(abc.ABC):
     """
 
   @abc.abstractmethod
-  def reset(self) -> None:
+  def reset(self, rng: np.random.Generator) -> None:
     """Resets the material."""
 
   @abc.abstractmethod
   def apply_control(
       self,
+      rng: np.random.Generator,
       control: microscope_utils.BeamControl,
       start_time: dt.timedelta,
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
@@ -233,23 +234,22 @@ class PristineSingleDopedGraphene(Material):
 
   def __init__(
       self,
-      rng: np.random.Generator,
       *,
       predict_rates: RatePredictionFn = simple_transition_rates,
       grid_columns: int = 50,
   ):
-    self.rng = rng
     self._grid_columns = grid_columns
 
     # Set in reset, declared here to help type-checkers.
+    self._has_been_reset = False
     self.atom_positions: np.ndarray
     self.atomic_numbers: np.ndarray
     self.nearest_neighbors: neighbors.NearestNeighbors
     self._predict_rates = predict_rates
 
-    self.reset()
+  def reset(self, rng: np.random.Generator) -> None:
+    self._has_been_reset = True
 
-  def reset(self) -> None:
     grid = _generate_hexagonal_grid(self._grid_columns)
 
     # Scale the grid to have the correct cell distance.
@@ -260,7 +260,7 @@ class PristineSingleDopedGraphene(Material):
     grid = grid - np.mean(grid, axis=0, keepdims=True)
 
     # Apply a random rotation to the grid.
-    rotation_angle = self.rng.uniform(0.0, 2 * np.pi)
+    rotation_angle = rng.uniform(0.0, 2 * np.pi)
     rotation_matrix = np.asarray([
         [np.cos(rotation_angle), -np.sin(rotation_angle)],
         [np.sin(rotation_angle), np.cos(rotation_angle)],
@@ -295,7 +295,11 @@ class PristineSingleDopedGraphene(Material):
       The observed atomic grid within the supplied bounds. Atom positions
         are normalized in [0, 1], where (0, 0) corresponds to lower_left and
         (1, 1) corresponds to upper_right.
+
+    Raises:
+      RuntimeError: If called before reset.
     """
+    self._assert_has_been_reset('get_atoms_in_bounds')
     lower_left = np.asarray(lower_left)
     upper_right = np.asarray(upper_right)
 
@@ -322,11 +326,13 @@ class PristineSingleDopedGraphene(Material):
 
   def apply_control(
       self,
+      rng: np.random.Generator,
       control: microscope_utils.BeamControl,
       start_time: dt.timedelta,
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates applying a beam exposure to the material."""
+    self._assert_has_been_reset('apply_control')
     # There is a chance that, if the dwell time is long enough, there
     # will be multiple state transitions. We simulate these transitions
     # until the dwell time is over.
@@ -352,7 +358,7 @@ class PristineSingleDopedGraphene(Material):
       # The time at which the next transition takes place is modeled
       # by an exponential distribution, with the total rate as the
       # parameter. Scale is the inverse rate.
-      transition_seconds = self.rng.exponential(scale=1.0 / total_rate)
+      transition_seconds = rng.exponential(scale=1.0 / total_rate)
       # Avoid np.inf when using very small rates. Clip arbitrarily to 1 hour.
       transition_seconds = min(transition_seconds, 3600)
       transition_time = dt.timedelta(seconds=transition_seconds)
@@ -368,10 +374,10 @@ class PristineSingleDopedGraphene(Material):
         neighbors_prob = transition_rates / total_rate
 
         # Pick index to transition to.
-        si_atom_index = self.rng.choice(si_neighbors_index, p=neighbors_prob)
-        self.atomic_numbers[
-            self.atomic_numbers == constants.SILICON
-        ] = constants.CARBON
+        si_atom_index = rng.choice(si_neighbors_index, p=neighbors_prob)
+        self.atomic_numbers[self.atomic_numbers == constants.SILICON] = (
+            constants.CARBON
+        )
         self.atomic_numbers[si_atom_index] = constants.SILICON
 
         for observer in observers:
@@ -382,14 +388,22 @@ class PristineSingleDopedGraphene(Material):
   @property
   def atomic_grid(self) -> microscope_utils.AtomicGrid:
     """Gets the atomic grid representing the current material state."""
+    self._assert_has_been_reset('atomic_grid')
     return microscope_utils.AtomicGrid(
         self.atom_positions, np.copy(self.atomic_numbers)
     )
 
   def get_silicon_position(self) -> np.ndarray:
+    self._assert_has_been_reset('get_silicon_position')
     return self.atom_positions[
         self.atomic_numbers == constants.SILICON
     ].reshape(-1)
+
+  def _assert_has_been_reset(self, fn_name: str) -> None:
+    if not self._has_been_reset:
+      raise RuntimeError(
+          f'Must call reset on {self.__class__} before {fn_name}.'
+      )
 
 
 def get_silicon_positions(grid: microscope_utils.AtomicGrid) -> np.ndarray:

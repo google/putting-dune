@@ -33,15 +33,13 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     self.goal = goals.SingleSiliconGoalReaching()
     # Make a small graphene sheet to more thoroughly test what happens
     # at the edge of a graphene sheet.
-    self.material = graphene.PristineSingleDopedGraphene(
-        self.rng, grid_columns=20
-    )
+    self.material = graphene.PristineSingleDopedGraphene(grid_columns=50)
     self.sim = simulator.PuttingDuneSimulator(self.material)
 
   def test_goal_position_is_set_to_a_lattice_position(self):
     # Reset several times to check it's always a lattice position.
     for _ in range(10):
-      obs = self.sim.reset()
+      obs = self.sim.reset(self.rng)
       self.goal.reset(self.rng, obs)
 
       neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
@@ -56,21 +54,20 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
 
     # Reset several times to check it's not near an edge.
     for _ in range(100):
-      obs = self.sim.reset()
+      obs = self.sim.reset(self.rng)
       self.goal.reset(self.rng, obs)
 
       # We look at the neighbor distances in the material frame.
       neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
           self.goal.goal_position_material_frame.reshape(1, -1)
       )
-      print(neighbor_distances)
       self.assertLessEqual(
           neighbor_distances[0, -1],
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
       )
 
   def test_reward_increases_when_silicon_is_nearer_goal(self):
-    obs = self.sim.reset()
+    obs = self.sim.reset(self.rng)
     self.goal.reset(self.rng, obs)
 
     # Normally goals should be on the grid, but we can fake it for this test.
@@ -86,7 +83,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     self.assertGreater(closer_result.reward, further_result.reward)
 
   def test_returns_terminal_when_silicon_is_at_goal(self):
-    obs = self.sim.reset()
+    obs = self.sim.reset(self.rng)
     self.goal.reset(self.rng, obs)
 
     # Make an observation with the silicon at the goal position.
@@ -115,14 +112,14 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     self.assertTrue(result.is_terminal)
 
   def test_no_goals_within_1_angstrom(self):
-    obs = self.sim.reset()
+    obs = self.sim.reset(self.rng)
     self.goal.goal_range_angstroms = (0.1, 1.0)
 
     with self.assertRaises(RuntimeError):
       self.goal.reset(self.rng, obs)
 
   def test_three_possible_goals_one_step_away(self):
-    obs = self.sim.reset()
+    obs = self.sim.reset(self.rng)
     # 1.42 = 1 bond distance.
     self.goal.goal_range_angstroms = (1.40, 1.44)
 
