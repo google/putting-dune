@@ -18,7 +18,7 @@
 import dataclasses
 import datetime as dt
 import typing
-from typing import Optional, Tuple
+from typing import Tuple, Sequence, Optional
 
 import numpy as np
 from putting_dune import geometry
@@ -214,4 +214,16 @@ class Transition:
   fov_before: MicroscopeFieldOfView
   fov_after: MicroscopeFieldOfView
   controls: Tuple[BeamControl, ...]
+
+
+
+@dataclasses.dataclass(frozen=True)
+class Trajectory:
+  """A trajectory of observations from a microscope.
+
+  Attributes:
+    observations: Sequence of MicroscopeObservations
+  """
+
+  observations: Sequence[MicroscopeObservation]
 

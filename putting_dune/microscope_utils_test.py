@@ -39,6 +39,14 @@ _OBSERVATION = microscope_utils.MicroscopeObservation(
     fov=_FOV,
     controls=(_BEAM_CONTROL, _BEAM_CONTROL),
     elapsed_time=dt.timedelta(seconds=6),
+    image=np.ones((2, 2, 1)),
+)
+_OBSERVATION_WITHOUT_IMAGE = microscope_utils.MicroscopeObservation(
+    grid=_ATOMIC_GRID,
+    fov=_FOV,
+    controls=(_BEAM_CONTROL, _BEAM_CONTROL),
+    elapsed_time=dt.timedelta(seconds=6),
+    image=None,
 )
 _TRANSITION = microscope_utils.Transition(
     grid_before=_ATOMIC_GRID,
@@ -46,6 +54,9 @@ _TRANSITION = microscope_utils.Transition(
     fov_before=_FOV,
     fov_after=_FOV,
     controls=(_BEAM_CONTROL, _BEAM_CONTROL),
+)
+_TRAJECTORY = microscope_utils.Trajectory(
+    observations=[_OBSERVATION, _OBSERVATION_WITHOUT_IMAGE],
 )
 
 
@@ -148,6 +159,65 @@ class SimulatorUtilsTest(absltest.TestCase):
       self.assertAlmostEqual(microscope_point.x, point.x)
       self.assertAlmostEqual(microscope_point.y, point.y)
 
+
+  def test_trajectory_can_be_created_from_proto(self):
+    # We already have tests that to_proto works successfully, so
+    # we use it here to make this test much shorted (and easier to follow).
+    trajectory_proto = _TRAJECTORY.to_proto()
+    trajectory = microscope_utils.Trajectory.from_proto(trajectory_proto)
+    for observation, converted_observation in zip(_TRAJECTORY.observations,
+                                                  trajectory.observations):
+      # Compare grids.
+      with self.subTest('grids'):
+        np.testing.assert_array_equal(
+            observation.grid.atomic_numbers,
+            converted_observation.grid.atomic_numbers,
+        )
+        np.testing.assert_allclose(
+            observation.grid.atom_positions,
+            converted_observation.grid.atom_positions,
+        )
+
+      # Compare fov.
+      with self.subTest('fov'):
+        np.testing.assert_allclose(
+            np.asarray(observation.fov.lower_left),
+            np.asarray(converted_observation.fov.lower_left),
+        )
+        np.testing.assert_allclose(
+            np.asarray(observation.fov.upper_right),
+            np.asarray(converted_observation.fov.upper_right),
+        )
+
+      # Compare controls.
+      with self.subTest('controls'):
+        self.assertLen(observation.controls, 2)
+        np.testing.assert_allclose(
+            np.asarray(observation.controls[0].position),
+            np.asarray(converted_observation.controls[0].position),
+        )
+        self.assertAlmostEqual(
+            observation.controls[0].dwell_time.total_seconds(),
+            converted_observation.controls[0].dwell_time.total_seconds(),
+            delta=1e-6,
+        )
+
+      # Compare elapsed time.
+      with self.subTest('elapsed_time'):
+        self.assertAlmostEqual(
+            observation.elapsed_time.total_seconds(),
+            converted_observation.elapsed_time.total_seconds(),
+            delta=1e-6,
+        )
+
+      # Compare image.
+      with self.subTest('image'):
+        if observation.image is None:
+          self.assertIsNone(converted_observation.image)
+        else:
+          np.testing.assert_allclose(
+              observation.image, converted_observation.image
+          )
 
 
 if __name__ == '__main__':
