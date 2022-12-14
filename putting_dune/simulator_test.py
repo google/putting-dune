@@ -167,11 +167,13 @@ class SimulatorTest(parameterized.TestCase):
 
     elapsed_time_before_reset = sim.elapsed_time
     atom_positions_before_reset = np.copy(sim.material.atom_positions)
+    image_parameters_before_reset = sim._image_parameters
 
     sim.reset(self._rng)
 
     elapsed_time_after_reset = sim.elapsed_time
     atom_positions_after_reset = np.copy(sim.material.atom_positions)
+    image_parameters_after_reset = sim._image_parameters
 
     # Check elapsed time was reset correctly.
     self.assertNotEqual(elapsed_time_after_reset, elapsed_time_before_reset)
@@ -183,6 +185,10 @@ class SimulatorTest(parameterized.TestCase):
     # is always initialized at the center of the grid.
     self.assertTrue(
         (atom_positions_before_reset != atom_positions_after_reset).any()
+    )
+
+    self.assertNotEqual(
+        image_parameters_before_reset, image_parameters_after_reset
     )
 
   def test_simulator_calls_observers_correctly(self):
@@ -287,6 +293,25 @@ class SimulatorTest(parameterized.TestCase):
     else:
       self.assertLen(image_events, 2)  # rest, after step.
     self.assertEqual(image_events[1].event_data['fov'], original_fov)
+
+  def test_reset_returns_image_on_request(self):
+    sim = simulator.PuttingDuneSimulator(self._material)
+
+    observation = sim.reset(self._rng, return_image=True)
+
+    self.assertIsInstance(observation.image, np.ndarray)
+    self.assertBetween(np.mean(observation.image), 0.0, 1.0)
+
+  def test_step_returns_image_on_request(self):
+    sim = simulator.PuttingDuneSimulator(self._material)
+    sim.reset(self._rng, return_image=False)
+
+    observation = sim.step_and_image(
+        self._rng, [_ARBITRARY_CONTROL], return_image=True
+    )
+
+    self.assertIsInstance(observation.image, np.ndarray)
+    self.assertBetween(np.mean(observation.image), 0.0, 1.0)
 
 
 if __name__ == '__main__':

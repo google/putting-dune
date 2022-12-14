@@ -18,7 +18,7 @@
 import dataclasses
 import datetime as dt
 import typing
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 from putting_dune import geometry
@@ -193,6 +193,7 @@ class MicroscopeObservation:
   fov: MicroscopeFieldOfView
   controls: Tuple[BeamControl, ...]
   elapsed_time: dt.timedelta
+  image: Optional[np.ndarray] = None
 
 
 

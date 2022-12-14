@@ -21,6 +21,7 @@ from typing import Sequence
 import numpy as np
 from putting_dune import geometry
 from putting_dune import graphene
+from putting_dune import imaging
 from putting_dune import microscope_utils
 
 
@@ -57,10 +58,13 @@ class PuttingDuneSimulator:
     # Will be instantiated on reset.
     self._has_been_reset = False
     self._fov: microscope_utils.MicroscopeFieldOfView
+    self._image_parameters: imaging.ImageGenerationParameters
     self.elapsed_time: dt.timedelta
 
   def reset(
-      self, rng: np.random.Generator
+      self,
+      rng: np.random.Generator,
+      return_image: bool = False,
   ) -> microscope_utils.MicroscopeObservation:
     """Reset to a plausible simulator state."""
     self._has_been_reset = True
@@ -79,16 +83,32 @@ class PuttingDuneSimulator:
     for observer in self._observers:
       observer.observe_reset(self.material.atomic_grid, self._fov)
 
-    observed_grid = self._image_material()
+    observed_grid = self._get_observed_grid()
+
+    # We always generate image parameters in case an image is
+    # requested in a subsequent call to step_and_image.
+    self._image_parameters = imaging.sample_image_parameters(rng)
+
+    # Render the new image, if it is required.
+    observed_image = None
+    if return_image:
+      observed_image = imaging.generate_stem_image(
+          observed_grid, self._fov, self._image_parameters, rng
+      )
 
     return microscope_utils.MicroscopeObservation(
-        observed_grid, self._fov, (), self.elapsed_time
+        grid=observed_grid,
+        fov=self._fov,
+        controls=(),
+        elapsed_time=self.elapsed_time,
+        image=observed_image,
     )
 
   def step_and_image(
       self,
       rng: np.random.Generator,
       controls: Sequence[microscope_utils.BeamControl],
+      return_image: bool = False,
   ) -> microscope_utils.MicroscopeObservation:
     """Update simulator state based on beam position delta.
 
@@ -99,6 +119,7 @@ class PuttingDuneSimulator:
       rng: The RNG to use during the stepping/imaging phase.
       controls: An iterable of controls to apply. This expects an iterable since
         we may want to accept a sequence of controls between generating images.
+      return_image: If True, will return an image observation.
 
     Returns:
       An observation from the simulator.
@@ -126,7 +147,7 @@ class PuttingDuneSimulator:
 
       self.elapsed_time += control.dwell_time
 
-    observed_grid = self._image_material()
+    observed_grid = self._get_observed_grid()
 
     observed_silicon_positions = graphene.get_silicon_positions(observed_grid)
     assert observed_silicon_positions.shape == (1, 2)
@@ -146,13 +167,21 @@ class PuttingDuneSimulator:
           geometry.Point(silicon_position - 10),
           geometry.Point(silicon_position + 10),
       )
-      observed_grid = self._image_material()
+      observed_grid = self._get_observed_grid()
+
+    # Render the new image, if it is required.
+    observed_image = None
+    if return_image:
+      observed_image = imaging.generate_stem_image(
+          observed_grid, self._fov, self._image_parameters, rng
+      )
 
     return microscope_utils.MicroscopeObservation(
-        observed_grid,
-        self._fov,
-        tuple(controls),
-        self.elapsed_time,
+        grid=observed_grid,
+        fov=self._fov,
+        controls=tuple(controls),
+        elapsed_time=self.elapsed_time,
+        image=observed_image,
     )
 
   def add_observer(self, observer: microscope_utils.SimulatorObserver) -> None:
@@ -163,8 +192,8 @@ class PuttingDuneSimulator:
   ) -> None:
     self._observers.remove(observer)
 
-  def _image_material(self) -> microscope_utils.AtomicGrid:
-    """Images the material and returns the observation."""
+  def _get_observed_grid(self) -> microscope_utils.AtomicGrid:
+    """Gets the atomic grid of all atoms in the field of view."""
     # Note: Currently we do not expect atoms/defects to diffuse through
     # the graphene sheet during an image capture. However, if this changes,
     # we should account for it here.
