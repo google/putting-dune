@@ -92,9 +92,7 @@ class PuttingDuneSimulator:
     # Render the new image, if it is required.
     observed_image = None
     if return_image:
-      observed_image = imaging.generate_stem_image(
-          observed_grid, self._fov, self._image_parameters, rng
-      )
+      observed_image = self._generate_image(observed_grid, rng)
 
     return microscope_utils.MicroscopeObservation(
         grid=observed_grid,
@@ -172,9 +170,7 @@ class PuttingDuneSimulator:
     # Render the new image, if it is required.
     observed_image = None
     if return_image:
-      observed_image = imaging.generate_stem_image(
-          observed_grid, self._fov, self._image_parameters, rng
-      )
+      observed_image = self._generate_image(observed_grid, rng)
 
     return microscope_utils.MicroscopeObservation(
         grid=observed_grid,
@@ -212,6 +208,18 @@ class PuttingDuneSimulator:
     self.elapsed_time += self._image_duration
 
     return observation
+
+  def _generate_image(
+      self, observed_grid: microscope_utils.AtomicGrid, rng: np.random.Generator
+  ) -> np.ndarray:
+    observed_image = imaging.generate_stem_image(
+        observed_grid, self._fov, self._image_parameters, rng
+    )
+
+    for observer in self._observers:
+      observer.observe_generated_image(self.elapsed_time, observed_image)
+
+    return observed_image
 
   def _assert_has_been_reset(self, fn_name: str) -> None:
     if not self._has_been_reset:

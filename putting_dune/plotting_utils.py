@@ -151,17 +151,29 @@ def generate_video_from_simulator_events(
   grid: microscope_utils.AtomicGrid = None
   fov: microscope_utils.MicroscopeFieldOfView = None
   control_position: np.ndarray = None
+  image: np.ndarray = None
   frames: List[Dict[str, Any]] = []
 
-  fig = plt.figure(figsize=(8, 4))
-  ax1, ax2 = fig.subplots(1, 2)
+  # Check if any of the events have images in them. If they do, plot them.
+  events_contain_images = False
+  for event in events:
+    if event.event_type == _SimulatorEventType.GENERATED_IMAGE:
+      events_contain_images = True
+      break
+
+  if events_contain_images:
+    fig = plt.figure(figsize=(12, 4))
+    axes = fig.subplots(1, 3)
+  else:
+    fig = plt.figure(figsize=(8, 4))
+    axes = fig.subplots(1, 2)
 
   def plot_frame(args: Dict[str, Any]) -> None:
-    ax1.clear()
-    ax2.clear()
+    for ax in axes:
+      ax.clear()
 
     plot_material_frame(
-        ax=ax1,
+        ax=axes[0],
         grid=args['grid'],
         goal_position=goal_position,
         control_position=args['control_position'],
@@ -183,11 +195,16 @@ def generate_video_from_simulator_events(
         material_frame_data
     )
     plot_microscope_frame(
-        ax=ax2,
+        ax=axes[1],
         grid=microscope_grid,
         goal_position=microscope_frame_data.atom_positions[0],
         control_position=microscope_frame_data.atom_positions[1],
     )
+
+    if events_contain_images and args['image'] is not None:
+      axes[2].imshow(args['image'], cmap='gray')
+      axes[2].set_xticks([])
+      axes[2].set_yticks([])
 
   for event in events:
     if event.event_type == _SimulatorEventType.RESET:
@@ -204,18 +221,22 @@ def generate_video_from_simulator_events(
           'fov': fov,
           'control_position': control_position,
           'timedelta': event.start_time,
+          'image': image,
       })
     if event.event_type == _SimulatorEventType.TRANSITION:
       grid = event.event_data['grid']
     if event.event_type == _SimulatorEventType.TAKE_IMAGE:
       fov = event.event_data['fov']
+    if event.event_type == _SimulatorEventType.GENERATED_IMAGE:
+      image = event.event_data['image']
 
-  # Append one last event to make hte plotting nicer.
+  # Append one last event to make the plotting nicer.
   frames.append({
       'grid': grid,
       'fov': fov,
       'control_position': control_position,
       'timedelta': events[-1].end_time,
+      'image': image,
   })
 
   anim = animation.FuncAnimation(fig, plot_frame, frames)

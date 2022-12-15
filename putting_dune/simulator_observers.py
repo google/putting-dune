@@ -20,6 +20,7 @@ import datetime as dt
 import enum
 from typing import Any, Dict
 
+import numpy as np
 from putting_dune import microscope_utils
 
 
@@ -28,6 +29,7 @@ class SimulatorEventType(enum.Enum):
   TRANSITION = enum.auto()
   APPLY_CONTROL = enum.auto()
   TAKE_IMAGE = enum.auto()
+  GENERATED_IMAGE = enum.auto()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -91,6 +93,17 @@ class EventObserver(microscope_utils.SimulatorObserver):
       fov: microscope_utils.MicroscopeFieldOfView,
   ) -> None:
     event = SimulatorEvent(
-        SimulatorEventType.TAKE_IMAGE, start_time, end_time, {'fov': fov}
+        SimulatorEventType.TAKE_IMAGE,
+        start_time,
+        end_time,
+        {'fov': fov},
+    )
+    self.events.append(event)
+
+  def observe_generated_image(
+      self, time: dt.timedelta, image: np.ndarray
+  ) -> None:
+    event = SimulatorEvent(
+        SimulatorEventType.GENERATED_IMAGE, time, time, {'image': image}
     )
     self.events.append(event)

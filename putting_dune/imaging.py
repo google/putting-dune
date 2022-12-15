@@ -66,6 +66,13 @@ def generate_clean_image(
 
     image = image + intensities * atomic_number**2
 
+  # np.histogram2d returns results transposed when compared to what we expect.
+  # The documentation states:
+  #   "Values in x are histogrammed along the first dimension and values in
+  #    y are histogrammed along the second dimension."
+  # After the transpose, the image is flipped upside-down, too.
+  image = np.flipud(np.transpose(image))
+
   fov_width = fov.upper_right.x - fov.lower_left.x
   fov_height = fov.upper_right.y - fov.lower_left.y
 

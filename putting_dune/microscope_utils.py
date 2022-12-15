@@ -184,6 +184,13 @@ class SimulatorObserver:
   ) -> None:
     pass
 
+  def observe_generated_image(
+      self,
+      time: dt.timedelta,
+      image: np.ndarray,
+  ) -> None:
+    pass
+
 
 @dataclasses.dataclass(frozen=True)
 class MicroscopeObservation:
