@@ -83,7 +83,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._requires_reset = False
 
     # Generate a realistic doped graphene configuration.
-    self._last_microscope_observation = self.sim.reset(self._rng)
+    self._last_microscope_observation = self.sim.reset(
+        self._rng, return_image=self._feature_constructor.requires_image
+    )
     self._action_adapter.reset()
     self._feature_constructor.reset()
     self.goal.reset(self._rng, self._last_microscope_observation)
@@ -111,7 +113,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     # 2. Step the simulator with the action returned from ActionAdapter.
     self._last_microscope_observation = self.sim.step_and_image(
-        self._rng, simulator_controls
+        rng=self._rng,
+        controls=simulator_controls,
+        return_image=self._feature_constructor.requires_image,
     )
 
     # 3. Create an observation with ObservationConstructor, using
