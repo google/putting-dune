@@ -15,10 +15,12 @@
 # pyformat: mode=pyink
 """Tests for putting_dune_environment."""
 
+import typing
 from unittest import mock
 
 from absl.testing import absltest
 import dm_env
+from dm_env import specs
 import numpy as np
 from putting_dune import goals
 from putting_dune import test_utils
@@ -52,20 +54,22 @@ class PuttingDuneEnvironmentTest(absltest.TestCase):
   def test_environment_reset(self):
     step = self.env.reset()
 
+    observation = typing.cast(np.ndarray, step.observation)
+    observation_spec = typing.cast(specs.Array, self.env.observation_spec())
+
     self.assertIsInstance(step, dm_env.TimeStep)
-    self.assertSequenceEqual(
-        step.observation.shape, self.env.observation_spec().shape
-    )
+    self.assertSequenceEqual(observation.shape, observation_spec.shape)
 
   def test_environment_step(self):
     self.env.reset()
     action = np.zeros((2,), dtype=np.float32)
     step = self.env.step(action)
 
+    observation = typing.cast(np.ndarray, step.observation)
+    observation_spec = typing.cast(specs.Array, self.env.observation_spec())
+
     self.assertIsInstance(step, dm_env.TimeStep)
-    self.assertSequenceEqual(
-        step.observation.shape, self.env.observation_spec().shape
-    )
+    self.assertSequenceEqual(observation.shape, observation_spec.shape)
 
   def test_environment_render(self):
     self.env.reset()

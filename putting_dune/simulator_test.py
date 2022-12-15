@@ -191,10 +191,18 @@ class SimulatorTest(parameterized.TestCase):
         image_parameters_before_reset, image_parameters_after_reset
     )
 
-  def test_simulator_calls_observers_correctly(self):
+  @mock.patch.object(
+      graphene,
+      'simple_transition_rates',
+      autospec=True,
+      # About 15 events should occur per second on average.
+      return_value=np.full((3,), 5.0, dtype=np.float32),
+  )
+  def test_simulator_calls_observers_correctly(self, mock_rate_fn):
     observer = simulator_observers.EventObserver()
 
-    sim = simulator.PuttingDuneSimulator(self._material, observers=(observer,))
+    material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
+    sim = simulator.PuttingDuneSimulator(material, observers=(observer,))
 
     obs = sim.reset(self._rng)
 

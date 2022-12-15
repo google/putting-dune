@@ -17,13 +17,19 @@
 
 import abc
 import typing
+from typing import Dict, Union
 
+import cv2
 from dm_env import specs
 import numpy as np
 from putting_dune import goals
 from putting_dune import graphene
 from putting_dune import microscope_utils
 from sklearn import neighbors
+
+# This supports current usage. Expand as necessary.
+NestedObservation = Union[np.ndarray, Dict[str, 'NestedObservation']]
+NestedObservationSpec = Union[specs.Array, Dict[str, 'NestedObservationSpec']]
 
 
 class FeatureConstructor(abc.ABC):
@@ -42,12 +48,33 @@ class FeatureConstructor(abc.ABC):
       self,
       observation: microscope_utils.MicroscopeObservation,
       goal: goals.Goal,
-  ) -> np.ndarray:
+  ) -> NestedObservation:
     """Gets features for an agent based on the osbervation and goal."""
 
   @abc.abstractmethod
-  def observation_spec(self) -> specs.Array:
+  def observation_spec(self) -> NestedObservationSpec:
     """Gets the osbervation spec for the constructed features."""
+
+  @property
+  @abc.abstractmethod
+  def requires_image(self) -> bool:
+    """Returns True if the feature constructor requires an image."""
+
+
+def _get_silicon_goal_delta(
+    grid: microscope_utils.AtomicGrid,
+    fov: microscope_utils.MicroscopeFieldOfView,
+    goal: goals.SingleSiliconGoalReaching,
+) -> np.ndarray:
+  """Gets the delta from the current silicon position to goal in angstroms."""
+  silicon_position = graphene.get_silicon_positions(grid).reshape(2)
+  silicon_position_material_frame = fov.microscope_frame_to_material_frame(
+      silicon_position
+  )
+  goal_delta_angstroms = (
+      goal.goal_position_material_frame - silicon_position_material_frame
+  )
+  return goal_delta_angstroms
 
 
 class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
@@ -92,20 +119,14 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
     neighbor_distances = neighbor_distances[0, 1:].reshape(-1, 1)
     normalized_deltas = neighbor_deltas / neighbor_distances
 
-    material_frame_grid = observation.fov.microscope_frame_to_material_frame(
-        observation.grid
-    )
-    silicon_position_material_frame = graphene.get_silicon_positions(
-        material_frame_grid
-    ).reshape(2)
-    goal_delta_material_frame = (
-        goal.goal_position_material_frame - silicon_position_material_frame
+    goal_delta_angstroms = _get_silicon_goal_delta(
+        observation.grid, observation.fov, goal
     )
 
     obs = np.concatenate([
         silicon_position,
         normalized_deltas.reshape(-1),
-        goal_delta_material_frame,
+        goal_delta_angstroms,
     ])
 
     return obs.astype(np.float32)
@@ -115,3 +136,60 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
     # 6 for 3 nearest neighbor delta vectors.
     # 2 for goal delta.
     return specs.Array((2 + 6 + 2,), np.float32)
+
+  @property
+  def requires_image(self) -> bool:
+    """Returns True if the feature constructor requires an image."""
+    return False
+
+
+class ImageFeatureConstructor(FeatureConstructor):
+  """An image feature constructor for single silicon goal reaching."""
+
+  def reset(self) -> None:
+    pass
+
+  def get_features(
+      self,
+      observation: microscope_utils.MicroscopeObservation,
+      goal: goals.Goal,
+  ) -> Dict[str, np.ndarray]:
+    if not isinstance(goal, goals.SingleSiliconGoalReaching):
+      raise ValueError(
+          f'{self.__class__} only usable with goals.SingleSiliconGoalReaching.'
+          f' Got {goal.__class__}'
+      )
+    goal = typing.cast(goals.SingleSiliconGoalReaching, goal)
+
+    if observation.image is None:
+      raise RuntimeError(
+          f'No image found in obsevation for {self.__class__}.get_features.'
+      )
+
+    resized_image = (
+        cv2.resize(observation.image, (128, 128))
+        .reshape(128, 128, 1)
+        .astype(np.float32)
+    )
+
+    goal_delta_angstroms = _get_silicon_goal_delta(
+        observation.grid, observation.fov, goal
+    )
+
+    return {
+        'image': resized_image,
+        'goal_delta_angstroms': goal_delta_angstroms,
+    }
+
+  def observation_spec(self) -> Dict[str, specs.Array]:
+    return {
+        'image': specs.Array(
+            (128, 128, 1),
+            np.float32,
+        ),
+        'goal_delta_angstroms': specs.Array((2,), np.float32),
+    }
+
+  @property
+  def requires_image(self) -> bool:
+    return True

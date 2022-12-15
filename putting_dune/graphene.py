@@ -63,12 +63,13 @@ def simple_transition_rates(
   neighbor_positions = grid.atom_positions[neighbor_indices, :]
   neighbor_positions = neighbor_positions - current_position
   beam_pos = beam_pos - current_position
+
   # Distance between neighbors and beam position.
   dist = np.linalg.norm(beam_pos - neighbor_positions, axis=-1)
   # Normalize by carbon bond distance.
   dist = dist / constants.CARBON_BOND_DISTANCE_ANGSTROMS
   # Inverse square falloff for beam displacement.
-  rates = 1.0 / (np.square(dist) + 0.5)  # Maximum rate = 2.
+  rates = 1.0 / (np.square(dist * 4) + 1.0)  # Maximum rate = 1.
 
   # Rates for moving to the nearest neighbor positions.
   return rates

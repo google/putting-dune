@@ -21,6 +21,7 @@ from typing import Any
 import numpy as np
 from putting_dune import geometry
 from putting_dune import graphene
+from putting_dune import imaging
 from putting_dune import microscope_utils
 from putting_dune import putting_dune_environment
 from putting_dune import run_helpers
@@ -41,7 +42,7 @@ def create_simple_environment(
 
 
 def create_graphene_observation_with_single_silicon_in_fov(
-    rng: np.random.Generator,
+    rng: np.random.Generator, return_image: bool = False
 ) -> microscope_utils.MicroscopeObservation:
   """Creates an observation of graphene with single silicon for unit tests."""
   graphene_sheet = graphene.PristineSingleDopedGraphene()
@@ -52,11 +53,19 @@ def create_graphene_observation_with_single_silicon_in_fov(
       geometry.Point((silicon_position[0] - 5.0, silicon_position[1] - 5.0)),
       geometry.Point((silicon_position[0] + 5.0, silicon_position[1] + 5.0)),
   )
+  grid = graphene_sheet.get_atoms_in_bounds(fov.lower_left, fov.upper_right)
+
+  image = None
+  if return_image:
+    image_params = imaging.sample_image_parameters(rng)
+    image = imaging.generate_stem_image(grid, fov, image_params, rng)
+
   observation = microscope_utils.MicroscopeObservation(
-      graphene_sheet.get_atoms_in_bounds(fov.lower_left, fov.upper_right),
-      fov,
-      (),
-      dt.timedelta(seconds=0),
+      grid=grid,
+      fov=fov,
+      controls=(),
+      elapsed_time=dt.timedelta(seconds=0),
+      image=image,
   )
 
   return observation

@@ -140,7 +140,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
   def action_spec(self) -> specs.BoundedArray:
     return self._action_adapter.action_spec
 
-  def observation_spec(self) -> specs.Array:
+  def observation_spec(self) -> feature_constructors.NestedObservationSpec:
     return self._feature_constructor.observation_spec()
 
   def render(self):

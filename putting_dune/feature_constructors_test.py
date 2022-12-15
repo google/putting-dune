@@ -39,6 +39,31 @@ class FeatureConstructorsTest(absltest.TestCase):
     self.assertIsInstance(features, np.ndarray)
     self.assertEqual(features.shape, fc.observation_spec().shape)
 
+  def test_image_feature_constructor_returns_valid_features(self):
+    rng = np.random.default_rng(0)
+    observation = (
+        test_utils.create_graphene_observation_with_single_silicon_in_fov(
+            rng, return_image=True
+        )
+    )
+
+    goal = goals.SingleSiliconGoalReaching()
+    goal.reset(rng, observation)
+    fc = feature_constructors.ImageFeatureConstructor()
+
+    features = fc.get_features(observation, goal)
+
+    self.assertIsInstance(features, dict)
+    self.assertIsInstance(features['image'], np.ndarray)
+    self.assertIsInstance(features['goal_delta_angstroms'], np.ndarray)
+    self.assertEqual(
+        features['image'].shape, fc.observation_spec()['image'].shape
+    )
+    self.assertEqual(
+        features['goal_delta_angstroms'].shape,
+        fc.observation_spec()['goal_delta_angstroms'].shape,
+    )
+
 
 if __name__ == '__main__':
   absltest.main()

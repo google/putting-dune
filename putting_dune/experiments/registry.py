@@ -27,6 +27,8 @@ from putting_dune import graphene
 from putting_dune.experiments import experiments
 
 
+# -------------------- AGENTS --------------------
+
 
 def _get_relative_random_agent(
     rng: np.random.Generator, adapters_and_goal: experiments.AdaptersAndGoal
@@ -39,12 +41,28 @@ def _get_relative_random_agent(
   )
 
 
+# -------------------- AdaptersAndGoal --------------------
+
+
 def _get_single_silicon_goal_reaching_adapters() -> experiments.AdaptersAndGoal:
   return experiments.AdaptersAndGoal(
       action_adapter=action_adapters.RelativeToSiliconActionAdapter(),
       feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
       goal=goals.SingleSiliconGoalReaching(),
   )
+
+
+def _get_single_silicon_goal_reaching_from_pixels() -> (
+    experiments.AdaptersAndGoal
+):
+  return experiments.AdaptersAndGoal(
+      action_adapter=action_adapters.RelativeToSiliconActionAdapter(),
+      feature_constructor=feature_constructors.ImageFeatureConstructor(),
+      goal=goals.SingleSiliconGoalReaching(),
+  )
+
+
+# -------------------- SimulatorConfigs --------------------
 
 
 def _get_simple_rates_config() -> experiments.SimulatorConfig:
@@ -82,6 +100,10 @@ _TRAIN_EXPERIMENTS = frozendict.frozendict({
     'relative_prior_rates': experiments.TrainExperiment(
         get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
         get_simulator_config=_get_human_prior_rates_config,
+    ),
+    'relative_simple_rates_from_images': experiments.TrainExperiment(
+        get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+        get_simulator_config=_get_simple_rates_config,
     ),
 })
 
