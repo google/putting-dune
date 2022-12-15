@@ -32,6 +32,12 @@ class AtomicGrid:
   atom_positions: np.ndarray
   atomic_numbers: np.ndarray
 
+  def shift(self, shift_vector: np.ndarray) -> 'AtomicGrid':
+    # enforce broadcasting and error if shape is incorrect.
+    shift_vector = shift_vector.reshape(1, 2)
+    shifted_atom_positions = self.atom_positions + shift_vector
+    return AtomicGrid(shifted_atom_positions, self.atomic_numbers)
+
 
 
 @dataclasses.dataclass(frozen=True)
@@ -45,6 +51,12 @@ class BeamControl:
 
   position: geometry.Point
   dwell_time: dt.timedelta
+
+  def shift(self, shift: geometry.Point) -> 'BeamControl':
+    shifted_position = geometry.Point(
+        self.position.x + shift.x, self.position.y + shift.y
+    )
+    return BeamControl(shifted_position, self.dwell_time)
 
 
 
@@ -62,6 +74,15 @@ class MicroscopeFieldOfView:
 
   lower_left: geometry.Point
   upper_right: geometry.Point
+
+  def shift(self, shift: geometry.Point) -> 'MicroscopeFieldOfView':
+    new_lower_left = geometry.Point(
+        self.lower_left.x + shift.x, self.lower_left.y + shift.y
+    )
+    new_upper_right = geometry.Point(
+        self.upper_right.x + shift.x, self.upper_right.y + shift.y
+    )
+    return MicroscopeFieldOfView(new_lower_left, new_upper_right)
 
   @property
   def offset(self) -> geometry.Point:
