@@ -51,6 +51,38 @@ class ActionAdapter(abc.ABC):
     """Gets the action spec for the action adapter."""
 
 
+class DirectActionAdapter(ActionAdapter):
+  """An action adapter for specifying a point relative to the FOV."""
+
+  def reset(self) -> None:
+    """Resets the action adapter."""
+    pass
+
+  def get_action(
+      self,
+      previous_observation: microscope_utils.MicroscopeObservation,
+      action: np.ndarray,
+  ) -> List[microscope_utils.BeamControl]:
+    """Gets simulator controls from the agent action."""
+    del previous_observation  # Unused.
+
+    action = np.clip(action, 0.0, 1.0)
+    # TODO(joshgreaves): Choose/parameterize dwell time.
+    return [
+        microscope_utils.BeamControl(
+            position=geometry.Point(action),
+            dwell_time=dt.timedelta(seconds=1.5),
+        )
+    ]
+
+  @property
+  def action_spec(self) -> specs.BoundedArray:
+    """Gets the action spec for the action adapter."""
+    return specs.BoundedArray(
+        shape=(2,), dtype=np.float32, minimum=0.0, maximum=1.0
+    )
+
+
 class DeltaPositionActionAdapter(ActionAdapter):
   """An action adapter that moves the beam by a supplied delta.
 

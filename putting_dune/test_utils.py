@@ -41,7 +41,7 @@ def create_simple_environment(
   )
 
 
-def create_graphene_observation_with_single_silicon_in_fov(
+def create_single_silicon_observation(
     rng: np.random.Generator, return_image: bool = False
 ) -> microscope_utils.MicroscopeObservation:
   """Creates an observation of graphene with single silicon for unit tests."""

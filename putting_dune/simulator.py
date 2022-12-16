@@ -57,6 +57,7 @@ class PuttingDuneSimulator:
 
     # Will be instantiated on reset.
     self._has_been_reset = False
+    self._fov_scale: float
     self._fov: microscope_utils.MicroscopeFieldOfView
     self._image_parameters: imaging.ImageGenerationParameters
     self.elapsed_time: dt.timedelta
@@ -71,12 +72,13 @@ class PuttingDuneSimulator:
     # Re-initialize the material.
     self.material.reset(rng)
 
-    # TODO(joshgreaves): Maybe add noise to fov initialization.
-    # Initiate the fov with the silicon inside it.
+    # It is fine to initialize the silicon to the center of the frame,
+    # as that is something we are likely to do on the actual microscope.
+    self._fov_scale = rng.uniform(15, 30)  # width/height of FOV.
     silicon_position = self.material.get_silicon_position()
     self._fov = microscope_utils.MicroscopeFieldOfView(
-        geometry.Point(silicon_position - 10),
-        geometry.Point(silicon_position + 10),
+        geometry.Point(silicon_position - self._fov_scale / 2.0),
+        geometry.Point(silicon_position + self._fov_scale / 2.0),
     )
 
     self.elapsed_time = dt.timedelta(seconds=0)
@@ -162,8 +164,8 @@ class PuttingDuneSimulator:
       # from the material.
       silicon_position = self.material.get_silicon_position()
       self._fov = microscope_utils.MicroscopeFieldOfView(
-          geometry.Point(silicon_position - 10),
-          geometry.Point(silicon_position + 10),
+          geometry.Point(silicon_position - self._fov_scale / 2.0),
+          geometry.Point(silicon_position + self._fov_scale / 2.0),
       )
       observed_grid = self._get_observed_grid()
 

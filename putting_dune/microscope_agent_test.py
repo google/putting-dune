@@ -62,7 +62,7 @@ class MicroscopeAgentTest(absltest.TestCase):
 
     agent.reset(
         rng,
-        test_utils.create_graphene_observation_with_single_silicon_in_fov(rng),
+        test_utils.create_single_silicon_observation(rng),
     )
 
     self.assertTrue(agent._is_first_step)
@@ -73,9 +73,7 @@ class MicroscopeAgentTest(absltest.TestCase):
   def test_microscope_agent_steps_correctly(self):
     rng = np.random.default_rng(0)
     experiment = registry.create_microscope_experiment('relative_random')
-    observation = (
-        test_utils.create_graphene_observation_with_single_silicon_in_fov(rng)
-    )
+    observation = test_utils.create_single_silicon_observation(rng)
 
     agent = microscope_agent.MicroscopeAgent(rng, experiment)
     agent.reset(rng, observation)

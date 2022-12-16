@@ -26,9 +26,7 @@ class FeatureConstructorsTest(absltest.TestCase):
 
   def test_pristine_graphene_constructor_returns_valid_features(self):
     rng = np.random.default_rng(0)
-    observation = (
-        test_utils.create_graphene_observation_with_single_silicon_in_fov(rng)
-    )
+    observation = test_utils.create_single_silicon_observation(rng)
 
     goal = goals.SingleSiliconGoalReaching()
     goal.reset(rng, observation)
@@ -41,10 +39,8 @@ class FeatureConstructorsTest(absltest.TestCase):
 
   def test_image_feature_constructor_returns_valid_features(self):
     rng = np.random.default_rng(0)
-    observation = (
-        test_utils.create_graphene_observation_with_single_silicon_in_fov(
-            rng, return_image=True
-        )
+    observation = test_utils.create_single_silicon_observation(
+        rng, return_image=True
     )
 
     goal = goals.SingleSiliconGoalReaching()

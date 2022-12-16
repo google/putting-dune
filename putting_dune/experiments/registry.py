@@ -62,6 +62,14 @@ def _get_single_silicon_goal_reaching_from_pixels() -> (
   )
 
 
+def _get_direct_goal_reaching_from_pixels() -> experiments.AdaptersAndGoal:
+  return experiments.AdaptersAndGoal(
+      action_adapter=action_adapters.DirectActionAdapter(),
+      feature_constructor=feature_constructors.ImageFeatureConstructor(),
+      goal=goals.SingleSiliconGoalReaching(),
+  )
+
+
 # -------------------- SimulatorConfigs --------------------
 
 
@@ -103,6 +111,10 @@ _TRAIN_EXPERIMENTS = frozendict.frozendict({
     ),
     'relative_simple_rates_from_images': experiments.TrainExperiment(
         get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+        get_simulator_config=_get_simple_rates_config,
+    ),
+    'direct_simple_rates_from_images': experiments.TrainExperiment(
+        get_adapters_and_goal=_get_direct_goal_reaching_from_pixels,
         get_simulator_config=_get_simple_rates_config,
     ),
 })
