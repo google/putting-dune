@@ -22,10 +22,10 @@ from typing import List, Optional, Sequence, Tuple
 from absl import logging
 import dm_env
 import frozendict
-from putting_dune import agent_lib
 from putting_dune import plotting_utils
 from putting_dune import putting_dune_environment
 from putting_dune import simulator_observers
+from putting_dune.agents import agent_lib
 
 
 @dataclasses.dataclass(frozen=True)

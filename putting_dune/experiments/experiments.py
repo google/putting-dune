@@ -20,10 +20,10 @@ from typing import Callable
 
 import numpy as np
 from putting_dune import action_adapters
-from putting_dune import agent_lib
 from putting_dune import feature_constructors
 from putting_dune import goals
 from putting_dune import graphene
+from putting_dune.agents import agent_lib
 
 
 @dataclasses.dataclass(frozen=True)

@@ -20,10 +20,10 @@ from typing import List
 from absl.testing import absltest
 from matplotlib import animation
 import numpy as np
-from putting_dune import agent_lib
 from putting_dune import plotting_utils
 from putting_dune import simulator_observers
 from putting_dune import test_utils
+from putting_dune.agents import agent_lib
 
 
 def _generate_events_with_random_policy() -> (

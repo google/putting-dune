@@ -21,7 +21,7 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import dm_env
 import numpy as np
-from putting_dune import agent_lib
+from putting_dune.agents import agent_lib
 
 _ARBITRARY_STEP = dm_env.TimeStep(
     step_type=dm_env.StepType.MID,

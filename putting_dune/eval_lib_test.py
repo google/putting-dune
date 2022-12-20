@@ -22,10 +22,10 @@ from unittest import mock
 from absl.testing import absltest
 import dm_env
 import numpy as np
-from putting_dune import agent_lib
 from putting_dune import eval_lib
 from putting_dune import putting_dune_environment
 from putting_dune import test_utils
+from putting_dune.agents import agent_lib
 
 
 _TERMINAL_STEP = dm_env.termination(0.0, None)

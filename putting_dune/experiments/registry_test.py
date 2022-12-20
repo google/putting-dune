@@ -18,9 +18,9 @@
 from unittest import mock
 
 from absl.testing import absltest
+from putting_dune.agents import acme_eval_agent
 from putting_dune.experiments import experiments
 from putting_dune.experiments import registry
-
 
 
 # TODO(joshgreaves): Write tests for the individual creation functions.
