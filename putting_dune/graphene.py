@@ -301,8 +301,8 @@ class PristineSingleDopedGraphene(Material):
       RuntimeError: If called before reset.
     """
     self._assert_has_been_reset('get_atoms_in_bounds')
-    lower_left = np.asarray(lower_left)
-    upper_right = np.asarray(upper_right)
+    lower_left = np.asarray(lower_left.coords)
+    upper_right = np.asarray(upper_right.coords)
 
     indices_in_bounds = np.all(
         (

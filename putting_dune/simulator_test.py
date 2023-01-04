@@ -45,7 +45,8 @@ def _get_mock_material(
   material.get_atoms_in_bounds.return_value = _ARBITRARY_GRID
   # Place the silicon in the center of the FOV.
   material.get_silicon_position.return_value = (
-      np.asarray(fov.lower_left) + np.asarray(fov.upper_right)
+      np.asarray(fov.lower_left.coords).reshape(-1)
+      + np.asarray(fov.upper_right.coords).reshape(-1)
   ) / 2
   return material
 
@@ -98,8 +99,8 @@ class SimulatorTest(parameterized.TestCase):
     passed_probe_control = sim.material.apply_control.call_args[0][1]
     self.assertEqual(sim.material.apply_control.call_count, 1)
     np.testing.assert_allclose(
-        np.asarray(passed_probe_control.position),
-        np.asarray(predicted_control_position),
+        np.asarray(passed_probe_control.position.coords),
+        np.asarray(predicted_control_position.coords),
     )
 
   def test_simulator_step_takes_multiple_probe_positions(self):
@@ -154,8 +155,8 @@ class SimulatorTest(parameterized.TestCase):
         observations[0].grid.atomic_numbers, observations[1].grid.atomic_numbers
     )
     np.testing.assert_allclose(
-        np.asarray(observations[0].controls[-1].position),
-        np.asarray(observations[1].controls[-1].position),
+        np.asarray(observations[0].controls[-1].position.coords),
+        np.asarray(observations[1].controls[-1].position.coords),
     )
     self.assertEqual(observations[0].elapsed_time, observations[1].elapsed_time)
 

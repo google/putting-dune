@@ -102,7 +102,9 @@ class ActionAdaptersTest(parameterized.TestCase):
     controls = action_adapter.get_action(unused_observation, action)
 
     self.assertLen(controls, 1)
-    np.testing.assert_allclose(np.asarray(controls[0].position), action)
+    np.testing.assert_allclose(
+        np.asarray(controls[0].position.coords).reshape(-1), action
+    )
 
   def test_direct_adapter_has_acceptable_action_spec(self):
     action_adapter = action_adapters.DirectActionAdapter()
@@ -173,7 +175,8 @@ class ActionAdaptersTest(parameterized.TestCase):
     self.assertLen(simulator_controls, 1)
     self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
     np.testing.assert_allclose(
-        np.asarray(simulator_controls[0].position), expected_position
+        np.asarray(simulator_controls[0].position.coords).reshape(-1),
+        expected_position,
     )
 
   def test_relative_adapter_has_acceptable_action_spec(self) -> None:

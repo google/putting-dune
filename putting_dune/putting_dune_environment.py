@@ -154,7 +154,7 @@ class PuttingDuneEnvironment(dm_env.Environment):
     # TODO(joshgreaves): beam_position lags by 1 timestep.
     previous_controls = self._last_microscope_observation.controls
     if previous_controls:
-      beam_position = np.asarray(previous_controls[-1].position)
+      beam_position = np.asarray(previous_controls[-1].position.coords)
     else:
       beam_position = None
 

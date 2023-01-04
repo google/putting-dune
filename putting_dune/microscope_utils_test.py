@@ -68,7 +68,7 @@ class SimulatorUtilsTest(absltest.TestCase):
         upper_right=geometry.Point((1.0, 3.0)),
     )
 
-    offset = np.asarray(fov.offset)
+    offset = np.asarray(fov.offset.coords).reshape(-1)
     np.testing.assert_allclose(offset, np.asarray([0.5, 2.0]))
 
   def test_field_of_view_correctly_calculates_width(self):
@@ -181,12 +181,12 @@ class SimulatorUtilsTest(absltest.TestCase):
       # Compare fov.
       with self.subTest('fov'):
         np.testing.assert_allclose(
-            np.asarray(observation.fov.lower_left),
-            np.asarray(converted_observation.fov.lower_left),
+            np.asarray(observation.fov.lower_left.coords),
+            np.asarray(converted_observation.fov.lower_left.coords),
         )
         np.testing.assert_allclose(
-            np.asarray(observation.fov.upper_right),
-            np.asarray(converted_observation.fov.upper_right),
+            np.asarray(observation.fov.upper_right.coords),
+            np.asarray(converted_observation.fov.upper_right.coords),
         )
 
       # Compare controls.

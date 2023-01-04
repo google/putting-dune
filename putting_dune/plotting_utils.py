@@ -211,7 +211,9 @@ def generate_video_from_simulator_events(
       grid = event.event_data['grid']
       fov = event.event_data['fov']
     if event.event_type == _SimulatorEventType.APPLY_CONTROL:
-      control_position = np.asarray(event.event_data['position'])
+      control_position = np.asarray(
+          event.event_data['position'].coords
+      ).reshape(-1)
 
       # We plot after taking the control, since it is the most appealing
       # visual. We want to see the state of the system before the control,

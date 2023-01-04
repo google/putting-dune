@@ -87,7 +87,11 @@ class MicroscopeFieldOfView:
   @property
   def offset(self) -> geometry.Point:
     return geometry.Point(
-        (np.asarray(self.lower_left) + np.asarray(self.upper_right)) / 2
+        (
+            np.asarray(self.lower_left.coords).reshape(-1)
+            + np.asarray(self.upper_right.coords).reshape(-1)
+        )
+        / 2
     )
 
   @property
@@ -114,8 +118,8 @@ class MicroscopeFieldOfView:
 
   def microscope_frame_to_material_frame(self, point):
     """Converts a point from microscope frame to material frame."""
-    lower_left = np.asarray(self.lower_left).reshape(1, 2)
-    upper_right = np.asarray(self.upper_right).reshape(1, 2)
+    lower_left = np.asarray(self.lower_left.coords)
+    upper_right = np.asarray(self.upper_right.coords)
     scale = upper_right - lower_left
 
     if isinstance(point, AtomicGrid):
@@ -152,8 +156,8 @@ class MicroscopeFieldOfView:
 
   def material_frame_to_microscope_frame(self, point):
     """Converts a point from material frame to microscope frame."""
-    lower_left = np.asarray(self.lower_left).reshape(1, 2)
-    upper_right = np.asarray(self.upper_right).reshape(1, 2)
+    lower_left = np.asarray(self.lower_left.coords)
+    upper_right = np.asarray(self.upper_right.coords)
     scale = upper_right - lower_left
 
     if isinstance(point, AtomicGrid):
