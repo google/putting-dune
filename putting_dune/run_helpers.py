@@ -19,12 +19,9 @@ import typing
 from typing import Sequence
 
 from acme import wrappers
-from acme.utils.google import experiment_utils
 from putting_dune import microscope_utils
 from putting_dune import putting_dune_environment
 from putting_dune.experiments import experiments
-
-make_logger = experiment_utils.make_experiment_logger
 
 
 def create_putting_dune_env(

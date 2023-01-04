@@ -184,6 +184,7 @@ def build_experiment_config(
   else:
     checkpointing_config = None
 
+  # TODO(joshgreaves): Add a logger.
   return acme_experiments.ExperimentConfig(
       builder=ppo_builder,
       environment_factory=functools.partial(
@@ -194,6 +195,5 @@ def build_experiment_config(
       network_factory=NETWORKS[network],
       seed=seed,
       checkpointing=checkpointing_config,
-      logger_factory=run_helpers.make_logger,
       max_num_actor_steps=num_steps,
   )

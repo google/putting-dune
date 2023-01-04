@@ -16,14 +16,21 @@ keywords = []
 # pip dependencies of the project
 dependencies = [
     "absl-py",
-    "dm-acme",
+    "dm-acme[jax]",
+    "dm-sonnet",
     "dm_env",
     "etils>=0.9.0",
     "etils[eapp]>=0.9.0",
+    "frozendict",
+    "jax",
+    "jaxlib',
     "matplotlib",
     "numpy",
+    "opencv-python",
+    "scikit-image",
+    "scikit-learn",
+    "tensorflow",
     "shapely",
-    "sklearn",
 ]
 
 # This is set automatically by flit using `putting_dune.__version__`
