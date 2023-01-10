@@ -29,6 +29,7 @@ from putting_dune import graphene
 from putting_dune.agents import acme_eval_agent
 from putting_dune.agents import agent_lib
 from putting_dune.agents import ppo
+from putting_dune.agents import tf_eval_agent
 from putting_dune.experiments import experiments
 
 
@@ -44,6 +45,25 @@ def _get_relative_random_agent(
       adapters_and_goal.action_adapter.action_spec.maximum,
       adapters_and_goal.action_adapter.action_spec.shape,
   )
+
+
+def _create_get_tf_eval_agent(
+    path: str,
+) -> Callable[
+    [np.random.Generator, experiments.AdaptersAndGoal],
+    tf_eval_agent.TfEvalAgent,
+]:
+  """Gets a tf eval agent, loading from the specified path."""
+
+  def get_tf_eval_agent(
+      rng: np.random.Generator, adapters_and_goal: experiments.AdaptersAndGoal
+  ) -> tf_eval_agent.TfEvalAgent:
+    del rng  # Unused.
+    del adapters_and_goal  # Unused.
+
+    return tf_eval_agent.TfEvalAgent(path)
+
+  return get_tf_eval_agent
 
 
 def _create_get_ppo_agent(
@@ -145,26 +165,24 @@ def _get_human_prior_rates_config() -> experiments.SimulatorConfig:
   )
 
 
-_MICROSCOPE_EXPERIMENTS = frozendict.frozendict(
-    {
-        'relative_random': experiments.MicroscopeExperiment(
-            get_agent=_get_relative_random_agent,
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
-        ),
-        'ppo_simple_images': experiments.MicroscopeExperiment(
-            get_agent=_create_get_ppo_agent(
-                train_experiment_name='relative_simple_rates_from_images',
-                network='conv',
-                checkpoint_dir='ppo_from_images_221214',
-                download_url=(
-                    'https://storage.googleapis.com/spr_data_bucket_public/'
-                    'ppo_from_images_221214.zip'
-                ),
+_MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
+    'relative_random': experiments.MicroscopeExperiment(
+        get_agent=_get_relative_random_agent,
+        get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+    ),
+    'ppo_simple_images': experiments.MicroscopeExperiment(
+        get_agent=_create_get_ppo_agent(
+            train_experiment_name='relative_simple_rates_from_images',
+            network='conv',
+            checkpoint_dir='ppo_from_images_221214',
+            download_url=(
+                'https://storage.googleapis.com/spr_data_bucket_public/'
+                'ppo_from_images_221214.zip'
             ),
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
         ),
-    }
-)
+        get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+    ),
+})
 
 _TRAIN_EXPERIMENTS = frozendict.frozendict({
     'relative_simple_rates': experiments.TrainExperiment(
