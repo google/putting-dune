@@ -16,21 +16,17 @@
 """A collection of experiments."""
 
 from typing import Callable, Optional
-import urllib.request
-import zipfile
 
-from etils import epath
 import frozendict
 import numpy as np
 from putting_dune import action_adapters
 from putting_dune import feature_constructors
 from putting_dune import goals
 from putting_dune import graphene
-from putting_dune.agents import acme_eval_agent
 from putting_dune.agents import agent_lib
-from putting_dune.agents import ppo
 from putting_dune.agents import tf_eval_agent
 from putting_dune.experiments import experiments
+
 
 
 # -------------------- AGENTS --------------------
@@ -64,55 +60,6 @@ def _create_get_tf_eval_agent(
     return tf_eval_agent.TfEvalAgent(path)
 
   return get_tf_eval_agent
-
-
-def _create_get_ppo_agent(
-    train_experiment_name: str,
-    network: str,
-    checkpoint_dir: str,
-    checkpoint_number: Optional[int] = None,
-    download_url: Optional[str] = None,
-) -> Callable[
-    [np.random.Generator, experiments.AdaptersAndGoal],
-    acme_eval_agent.AcmeEvalAgent,
-]:
-  """Creates a function to get a PPO agent."""
-
-  def _create_ppo_experiment_inner(
-      rng: np.random.Generator, adapters_and_goal: experiments.AdaptersAndGoal
-  ) -> acme_eval_agent.AcmeEvalAgent:
-    del rng  # Unused.
-    del adapters_and_goal  # Unused.
-
-    experiments_path = epath.Path(__file__).parent.resolve()
-    model_weights_path = experiments_path / 'model_weights'
-    model_weights_path.mkdir(parents=False, exist_ok=True)
-
-    # Download the file if necessary.
-    if not (model_weights_path / checkpoint_dir).exists():
-      # TODO(joshgreaves): Delete zip file after.
-      zip_path = str(model_weights_path / 'tmp.zip')
-      urllib.request.urlretrieve(
-          download_url,
-          zip_path,
-      )
-      with zipfile.ZipFile(zip_path, mode='r') as zf:
-        zf.extractall(model_weights_path)
-
-    train_experiment = create_train_experiment(train_experiment_name)
-    experiment_config = ppo.build_experiment_config(
-        seed=0,
-        experiment=train_experiment,
-        num_steps=100_000_000,
-        network=network,
-    )
-    return acme_eval_agent.AcmeEvalAgent(
-        experiment_config,
-        str(model_weights_path / checkpoint_dir),
-        checkpoint_number,
-    )
-
-  return _create_ppo_experiment_inner
 
 
 
@@ -165,24 +112,14 @@ def _get_human_prior_rates_config() -> experiments.SimulatorConfig:
   )
 
 
-_MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
-    'relative_random': experiments.MicroscopeExperiment(
-        get_agent=_get_relative_random_agent,
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
-    ),
-    'ppo_simple_images': experiments.MicroscopeExperiment(
-        get_agent=_create_get_ppo_agent(
-            train_experiment_name='relative_simple_rates_from_images',
-            network='conv',
-            checkpoint_dir='ppo_from_images_221214',
-            download_url=(
-                'https://storage.googleapis.com/spr_data_bucket_public/'
-                'ppo_from_images_221214.zip'
-            ),
+_MICROSCOPE_EXPERIMENTS = frozendict.frozendict(
+    {
+        'relative_random': experiments.MicroscopeExperiment(
+            get_agent=_get_relative_random_agent,
+            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
         ),
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
-    ),
-})
+    }
+)
 
 _TRAIN_EXPERIMENTS = frozendict.frozendict({
     'relative_simple_rates': experiments.TrainExperiment(
@@ -214,19 +151,6 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
             get_agent=_get_relative_random_agent,
             get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
             get_simulator_config=_get_human_prior_rates_config,
-        ),
-        'ppo_simple_images': experiments.EvalExperiment(
-            get_agent=_create_get_ppo_agent(
-                train_experiment_name='relative_simple_rates_from_images',
-                network='conv',
-                checkpoint_dir='ppo_from_images_221214',
-                download_url=(
-                    'https://storage.googleapis.com/spr_data_bucket_public/'
-                    'ppo_from_images_221214.zip'
-                ),
-            ),
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
-            get_simulator_config=_get_simple_rates_config,
         ),
     }
 )
