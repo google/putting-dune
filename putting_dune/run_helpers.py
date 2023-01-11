@@ -16,9 +16,10 @@
 """Shared helpers for RL experiments."""
 
 import typing
-from typing import Sequence
+from typing import Optional, Sequence
 
-from acme import wrappers
+import dm_env
+import numpy as np
 from putting_dune import microscope_utils
 from putting_dune import putting_dune_environment
 from putting_dune.experiments import experiments
@@ -42,8 +43,7 @@ def create_putting_dune_env(
       feature_constructor=adapters_and_goal.feature_constructor,
       goal=adapters_and_goal.goal,
   )
-  env = wrappers.SinglePrecisionWrapper(env)
-  env = wrappers.StepLimitWrapper(env, step_limit=step_limit)
+  env = StepLimitWrapper(env, step_limit=step_limit)
 
   # Before returning, cast the environment back to PuttingDuneEnvironment.
   # While not strictly true, it has the same public interface.
@@ -54,3 +54,100 @@ def create_putting_dune_env(
     env.sim.add_observer(observer)
 
   return env
+
+
+##################################################################
+# ENVIRONMENT WRAPPER - copied from Acme to avoid dependency.
+##################################################################
+
+
+class EnvironmentWrapper(dm_env.Environment):
+  """Environment that wraps another environment.
+
+  This exposes the wrapped environment with the `.environment` property and also
+  defines `__getattr__` so that attributes are invisibly forwarded to the
+  wrapped environment (and hence enabling duck-typing).
+  """
+
+  _environment: dm_env.Environment
+
+  def __init__(self, environment: dm_env.Environment):
+    self._environment = environment
+
+  def __getattr__(self, name):
+    if name.startswith("__"):
+      raise AttributeError(
+          "attempted to get missing private attribute '{}'".format(name)
+      )
+    return getattr(self._environment, name)
+
+  @property
+  def environment(self) -> dm_env.Environment:
+    return self._environment
+
+  # The following lines are necessary because methods defined in
+  # `dm_env.Environment` are not delegated through `__getattr__`, which would
+  # only be used to expose methods or properties that are not defined in the
+  # base `dm_env.Environment` class.
+
+  def step(self, action) -> dm_env.TimeStep:
+    return self._environment.step(action)
+
+  def reset(self) -> dm_env.TimeStep:
+    return self._environment.reset()
+
+  def action_spec(self):
+    return self._environment.action_spec()
+
+  def discount_spec(self):
+    return self._environment.discount_spec()
+
+  def observation_spec(self):
+    return self._environment.observation_spec()
+
+  def reward_spec(self):
+    return self._environment.reward_spec()
+
+  def close(self):
+    return self._environment.close()
+
+
+##################################################################
+# STEP LIMIT WRAPPER - copied from Acme to avoid dependency.
+##################################################################
+
+
+class StepLimitWrapper(EnvironmentWrapper):
+  """A wrapper which truncates episodes at the specified step limit."""
+
+  def __init__(
+      self, environment: dm_env.Environment, step_limit: Optional[int] = None
+  ):
+    super().__init__(environment)
+    self._step_limit = step_limit
+    self._elapsed_steps = 0
+
+  def reset(self) -> dm_env.TimeStep:
+    self._elapsed_steps = 0
+    return self._environment.reset()
+
+  def step(self, action: np.ndarray) -> dm_env.TimeStep:
+    if self._elapsed_steps == -1:
+      # The previous episode was truncated by the wrapper, so start a new one.
+      timestep = self._environment.reset()
+    else:
+      timestep = self._environment.step(action)
+    # If this is the first timestep, then this `step()` call was done on a new,
+    # terminated or truncated environment instance without calling `reset()`
+    # first. In this case this `step()` call should be treated as `reset()`,
+    # so should not increment step count.
+    if timestep.first():
+      self._elapsed_steps = 0
+      return timestep
+    self._elapsed_steps += 1
+    if self._step_limit is not None and self._elapsed_steps >= self._step_limit:
+      self._elapsed_steps = -1
+      return dm_env.truncation(
+          timestep.reward, timestep.observation, timestep.discount
+      )
+    return timestep
