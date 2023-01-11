@@ -15,8 +15,13 @@
 # pyformat: mode=pyink
 """A collection of experiments."""
 
+import dataclasses
 from typing import Callable, Optional
+import urllib.request
+import zipfile
 
+from absl import logging
+from etils import epath
 import frozendict
 import numpy as np
 from putting_dune import action_adapters
@@ -43,23 +48,57 @@ def _get_relative_random_agent(
   )
 
 
-def _create_get_tf_eval_agent(
-    path: str,
-) -> Callable[
-    [np.random.Generator, experiments.AdaptersAndGoal],
-    tf_eval_agent.TfEvalAgent,
-]:
+@dataclasses.dataclass(frozen=True)
+class _TfAgentCreator:
   """Gets a tf eval agent, loading from the specified path."""
 
-  def get_tf_eval_agent(
-      rng: np.random.Generator, adapters_and_goal: experiments.AdaptersAndGoal
+  model_name: str
+  download_url: str
+
+  def __call__(
+      self,
+      rng: np.random.Generator,
+      adapters_and_goal: experiments.AdaptersAndGoal,
   ) -> tf_eval_agent.TfEvalAgent:
     del rng  # Unused.
     del adapters_and_goal  # Unused.
 
-    return tf_eval_agent.TfEvalAgent(path)
 
-  return get_tf_eval_agent
+    logging.info('Loading %s', self.model_name)
+    experiments_path = epath.Path(__file__).parent.resolve()
+    model_weights_path = experiments_path / 'model_weights'
+    model_weights_path.mkdir(parents=False, exist_ok=True)
+    model_path = model_weights_path / self.model_name
+
+    # Download the file if necessary.
+    if not model_path.exists():
+      logging.info("Couldn't find agent checkpointing. Downloading...")
+      zip_path = model_weights_path / 'tmp.zip'
+      zip_path_str = str(zip_path)
+      urllib.request.urlretrieve(
+          self.download_url,
+          zip_path_str,
+      )
+
+      logging.info('Unzipping agent checkpoint...')
+      with zipfile.ZipFile(zip_path_str, mode='r') as zf:
+        zf.extractall(model_weights_path)
+
+      # Delete the zip file.
+      zip_path.unlink()
+
+    agent = tf_eval_agent.TfEvalAgent(str(model_path))
+    logging.info('Agent loaded!')
+    return agent
+
+
+_GET_PPO_SIMPLE_IMAGES_TF = _TfAgentCreator(
+    model_name='ppo_simple_images_tf',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        'ppo_simple_images_tf.zip'
+    ),
+)
 
 
 
@@ -112,14 +151,16 @@ def _get_human_prior_rates_config() -> experiments.SimulatorConfig:
   )
 
 
-_MICROSCOPE_EXPERIMENTS = frozendict.frozendict(
-    {
-        'relative_random': experiments.MicroscopeExperiment(
-            get_agent=_get_relative_random_agent,
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
-        ),
-    }
-)
+_MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
+    'relative_random': experiments.MicroscopeExperiment(
+        get_agent=_get_relative_random_agent,
+        get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+    ),
+    'ppo_simple_images_tf': experiments.MicroscopeExperiment(
+        get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
+        get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+    ),
+})
 
 _TRAIN_EXPERIMENTS = frozendict.frozendict({
     'relative_simple_rates': experiments.TrainExperiment(
@@ -151,6 +192,11 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
             get_agent=_get_relative_random_agent,
             get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
             get_simulator_config=_get_human_prior_rates_config,
+        ),
+        'ppo_simple_images_tf': experiments.EvalExperiment(
+            get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
+            get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+            get_simulator_config=_get_simple_rates_config,
         ),
     }
 )
