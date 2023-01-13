@@ -139,7 +139,7 @@ class PuttingDuneSimulator:
       )
 
       for observer in self._observers:
-        observer.observe_apply_control(self.elapsed_time, control)
+        observer.observe_apply_control(control)
 
       self.material.apply_control(
           rng, control, self.elapsed_time, self._observers
@@ -202,8 +202,7 @@ class PuttingDuneSimulator:
 
     for observer in self._observers:
       observer.observe_take_image(
-          start_time=self.elapsed_time,
-          end_time=self.elapsed_time + self._image_duration,
+          duration=self._image_duration,
           fov=self._fov,
       )
 
@@ -219,7 +218,7 @@ class PuttingDuneSimulator:
     )
 
     for observer in self._observers:
-      observer.observe_generated_image(self.elapsed_time, observed_image)
+      observer.observe_generated_image(observed_image)
 
     return observed_image
 

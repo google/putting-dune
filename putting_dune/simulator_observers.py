@@ -35,8 +35,6 @@ class SimulatorEventType(enum.Enum):
 @dataclasses.dataclass(frozen=True)
 class SimulatorEvent:
   event_type: SimulatorEventType
-  start_time: dt.timedelta
-  end_time: dt.timedelta
   event_data: Dict[str, Any]  # Not ideal, but saves a lot of boilerplate.
 
 
@@ -48,6 +46,7 @@ class EventObserver(microscope_utils.SimulatorObserver):
     - State transition.
     - Apply control.
     - Take image.
+    - Generate image.
   """
 
   def __init__(self):
@@ -61,49 +60,47 @@ class EventObserver(microscope_utils.SimulatorObserver):
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.RESET,
-        dt.timedelta(seconds=0),
-        dt.timedelta(seconds=0),
         {'grid': grid, 'fov': fov},
     )
     self.events = [event]
 
   def observe_transition(
-      self, time: dt.timedelta, grid: microscope_utils.AtomicGrid
+      self,
+      time_since_control_was_applied: dt.timedelta,
+      grid: microscope_utils.AtomicGrid,
   ) -> None:
     event = SimulatorEvent(
-        SimulatorEventType.TRANSITION, time, time, {'grid': grid}
+        SimulatorEventType.TRANSITION,
+        {
+            'time_since_control_was_applied': time_since_control_was_applied,
+            'grid': grid,
+        },
     )
     self.events.append(event)
 
   def observe_apply_control(
-      self, start_time: dt.timedelta, control: microscope_utils.BeamControl
+      self, control: microscope_utils.BeamControl
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.APPLY_CONTROL,
-        start_time,
-        start_time + control.dwell_time,
-        {'position': control.position},
+        {'dwell_time': control.dwell_time, 'position': control.position},
     )
     self.events.append(event)
 
   def observe_take_image(
       self,
-      start_time: dt.timedelta,
-      end_time: dt.timedelta,
+      duration: dt.timedelta,
       fov: microscope_utils.MicroscopeFieldOfView,
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.TAKE_IMAGE,
-        start_time,
-        end_time,
-        {'fov': fov},
+        {'duration': duration, 'fov': fov},
     )
     self.events.append(event)
 
   def observe_generated_image(
-      self, time: dt.timedelta, image: np.ndarray
+      self,
+      image: np.ndarray,
   ) -> None:
-    event = SimulatorEvent(
-        SimulatorEventType.GENERATED_IMAGE, time, time, {'image': image}
-    )
+    event = SimulatorEvent(SimulatorEventType.GENERATED_IMAGE, {'image': image})
     self.events.append(event)

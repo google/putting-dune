@@ -383,7 +383,8 @@ class PristineSingleDopedGraphene(Material):
 
         for observer in observers:
           observer.observe_transition(
-              time=start_time + elapsed_time, grid=self.atomic_grid
+              time_since_control_was_applied=elapsed_time,
+              grid=self.atomic_grid,
           )
 
   @property

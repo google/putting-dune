@@ -78,7 +78,13 @@ def _plot(
 
   # Plot the current time.
   if timedelta is not None:
-    ax.text(0.01, 0.01, format_timedelta(timedelta), fontsize='x-large')
+    lower_left = np.min(grid.atom_positions, axis=0)
+    ax.text(
+        lower_left[0],
+        lower_left[1],
+        format_timedelta(timedelta),
+        fontsize='x-large',
+    )
 
 
 def plot_microscope_frame(
@@ -206,6 +212,7 @@ def generate_video_from_simulator_events(
       axes[2].set_xticks([])
       axes[2].set_yticks([])
 
+  elapsed_time = dt.timedelta(seconds=0)
   for event in events:
     if event.event_type == _SimulatorEventType.RESET:
       grid = event.event_data['grid']
@@ -222,13 +229,17 @@ def generate_video_from_simulator_events(
           'grid': grid,
           'fov': fov,
           'control_position': control_position,
-          'timedelta': event.start_time,
+          'timedelta': elapsed_time,
           'image': image,
       })
+
+      # Tick the clock.
+      elapsed_time += event.event_data['dwell_time']
     if event.event_type == _SimulatorEventType.TRANSITION:
       grid = event.event_data['grid']
     if event.event_type == _SimulatorEventType.TAKE_IMAGE:
       fov = event.event_data['fov']
+      elapsed_time += event.event_data['duration']
     if event.event_type == _SimulatorEventType.GENERATED_IMAGE:
       image = event.event_data['image']
 
@@ -237,7 +248,7 @@ def generate_video_from_simulator_events(
       'grid': grid,
       'fov': fov,
       'control_position': control_position,
-      'timedelta': events[-1].end_time,
+      'timedelta': elapsed_time,
       'image': image,
   })
 

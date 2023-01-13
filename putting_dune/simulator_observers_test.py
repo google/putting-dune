@@ -35,16 +35,13 @@ class SimulatorObserversTest(absltest.TestCase):
     )
     observer.observe_reset(grid, fov)
     observer.observe_apply_control(
-        dt.timedelta(seconds=1.0),
         microscope_utils.BeamControl(
             geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)
         ),
     )
-    observer.observe_transition(dt.timedelta(seconds=2.0), grid)
-    observer.observe_transition(dt.timedelta(seconds=3.0), grid)
-    observer.observe_take_image(
-        dt.timedelta(seconds=4.0), dt.timedelta(seconds=4.0), fov
-    )
+    observer.observe_transition(dt.timedelta(seconds=0.2), grid)
+    observer.observe_transition(dt.timedelta(seconds=0.6), grid)
+    observer.observe_take_image(dt.timedelta(seconds=1.5), fov)
 
     events = observer.events
     self.assertLen(events, 5)

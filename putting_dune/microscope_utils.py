@@ -191,27 +191,23 @@ class SimulatorObserver:
   def observe_reset(self, grid: AtomicGrid, fov: MicroscopeFieldOfView) -> None:
     pass
 
-  def observe_apply_control(
-      self, start_time: dt.timedelta, control: BeamControl
-  ) -> None:
-    # end_time can be inferred from start_time and dwell_time.
+  def observe_apply_control(self, control: BeamControl) -> None:
     pass
 
-  def observe_transition(self, time: dt.timedelta, grid: AtomicGrid) -> None:
-    # Transition assumed to be instantaneous.
+  def observe_transition(
+      self, time_since_control_was_applied: dt.timedelta, grid: AtomicGrid
+  ) -> None:
     pass
 
   def observe_take_image(
       self,
-      start_time: dt.timedelta,
-      end_time: dt.timedelta,
+      duration: dt.timedelta,
       fov: MicroscopeFieldOfView,
   ) -> None:
     pass
 
   def observe_generated_image(
       self,
-      time: dt.timedelta,
       image: np.ndarray,
   ) -> None:
     pass
