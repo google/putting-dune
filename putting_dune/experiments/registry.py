@@ -16,7 +16,8 @@
 """A collection of experiments."""
 
 import dataclasses
-from typing import Callable, Optional
+import datetime as dt
+from typing import Callable, Optional, Tuple
 import urllib.request
 import zipfile
 
@@ -114,14 +115,21 @@ def _get_single_silicon_goal_reaching_adapters() -> experiments.AdaptersAndGoal:
   )
 
 
-def _get_single_silicon_goal_reaching_from_pixels() -> (
-    experiments.AdaptersAndGoal
-):
-  return experiments.AdaptersAndGoal(
-      action_adapter=action_adapters.RelativeToSiliconActionAdapter(),
-      feature_constructor=feature_constructors.ImageFeatureConstructor(),
-      goal=goals.SingleSiliconGoalReaching(),
+@dataclasses.dataclass(frozen=True)
+class _SingleSiliconGoalReachingFromPixels:
+  dwell_time_range: Tuple[dt.timedelta, dt.timedelta] = (
+      dt.timedelta(seconds=1.5),
+      dt.timedelta(seconds=1.5),
   )
+
+  def __call__(self) -> experiments.AdaptersAndGoal:
+    return experiments.AdaptersAndGoal(
+        action_adapter=action_adapters.RelativeToSiliconActionAdapter(
+            dwell_time_range=self.dwell_time_range
+        ),
+        feature_constructor=feature_constructors.ImageFeatureConstructor(),
+        goal=goals.SingleSiliconGoalReaching(),
+    )
 
 
 def _get_direct_goal_reaching_from_pixels() -> experiments.AdaptersAndGoal:
@@ -158,7 +166,7 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
     ),
     'ppo_simple_images_tf': experiments.MicroscopeExperiment(
         get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+        get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
     ),
 })
 
@@ -172,8 +180,19 @@ _TRAIN_EXPERIMENTS = frozendict.frozendict({
         get_simulator_config=_get_human_prior_rates_config,
     ),
     'relative_simple_rates_from_images': experiments.TrainExperiment(
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+        get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
         get_simulator_config=_get_simple_rates_config,
+    ),
+    'relative_simple_rates_from_images_variable_time': (
+        experiments.TrainExperiment(
+            get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(
+                dwell_time_range=(
+                    dt.timedelta(seconds=1.0),
+                    dt.timedelta(seconds=10.0),
+                )
+            ),
+            get_simulator_config=_get_simple_rates_config,
+        )
     ),
     'direct_simple_rates_from_images': experiments.TrainExperiment(
         get_adapters_and_goal=_get_direct_goal_reaching_from_pixels,
@@ -195,7 +214,7 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
         ),
         'ppo_simple_images_tf': experiments.EvalExperiment(
             get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_from_pixels,
+            get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
             get_simulator_config=_get_simple_rates_config,
         ),
     }

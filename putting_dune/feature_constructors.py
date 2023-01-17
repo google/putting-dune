@@ -177,8 +177,8 @@ class ImageFeatureConstructor(FeatureConstructor):
     )
 
     return {
-        'image': resized_image,
-        'goal_delta_angstroms': goal_delta_angstroms,
+        'image': resized_image.astype(np.float32),
+        'goal_delta_angstroms': goal_delta_angstroms.astype(np.float32),
     }
 
   def observation_spec(self) -> Dict[str, specs.Array]:

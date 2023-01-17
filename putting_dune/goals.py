@@ -152,9 +152,10 @@ class SingleSiliconGoalReaching(Goal):
       raise RuntimeError(f'Found {num_silicon} silicon when 1 was expected.')
     silicon_position_material_frame = silicon_positions.reshape(2)
 
-    cost = np.linalg.norm(
-        silicon_position_material_frame - self.goal_position_material_frame
-    )
+    # If we want a dense reward, we can use this cost.
+    # cost = np.linalg.norm(
+    #     silicon_position_material_frame - self.goal_position_material_frame
+    # )
 
     # Update whether the silicon is near the goal.
     goal_radius = constants.CARBON_BOND_DISTANCE_ANGSTROMS * 0.5
@@ -172,4 +173,12 @@ class SingleSiliconGoalReaching(Goal):
         >= self._required_consecutive_goal_steps_for_termination
     )
 
-    return GoalReturn(reward=-cost, is_terminal=is_terminal, is_truncated=False)
+    reward = 0.0
+    if is_terminal:
+      reward = (
+          constants.GAMMA_PER_SECOND ** observation.elapsed_time.total_seconds()
+      )
+
+    return GoalReturn(
+        reward=reward, is_terminal=is_terminal, is_truncated=False
+    )

@@ -27,3 +27,10 @@ CARBON_BOND_DISTANCE_ANGSTROMS = 1.42
 SIGR_PRIOR_RATE_MEAN = np.array((0.85, 0))
 SIGR_PRIOR_RATE_COV = np.array(((0.1, 0), (0, 0.1)))
 SIGR_PRIOR_MAX_RATE = np.log(2) / 3
+
+# Constant RL Parameters.
+# This initial value is a little arbitrary, and we should probably tune it.
+# It is set based on our initial experiments, where each timestep took
+# 3 seconds (1.5 second dwell, 1.5 second scan), and a discount of 0.99 per
+# step. This is equivalent (0.9967^3 ~= 0.99).
+GAMMA_PER_SECOND = 0.9967

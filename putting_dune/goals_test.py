@@ -15,6 +15,8 @@
 # pyformat: mode=pyink
 """Tests for goals."""
 
+import unittest
+
 from absl.testing import absltest
 import numpy as np
 from putting_dune import constants
@@ -66,6 +68,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
       )
 
+  @unittest.skip('The reward is now sparse. If we switch back, un-skip this.')
   def test_reward_increases_when_silicon_is_nearer_goal(self):
     obs = self.sim.reset(self.rng)
     self.goal.reset(self.rng, obs)

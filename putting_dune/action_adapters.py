@@ -17,7 +17,7 @@
 
 import abc
 import datetime as dt
-from typing import List
+from typing import List, Tuple
 
 from dm_env import specs
 import numpy as np
@@ -128,6 +128,19 @@ class DeltaPositionActionAdapter(ActionAdapter):
 class RelativeToSiliconActionAdapter(ActionAdapter):
   """An action adapter that accepts a relative position to a silicon atom."""
 
+  def __init__(
+      self,
+      *,
+      dwell_time_range: Tuple[dt.timedelta, dt.timedelta] = (
+          dt.timedelta(seconds=1.5),
+          dt.timedelta(seconds=1.5),
+      ),
+  ):
+    min_dwell_time, max_dwell_time = dwell_time_range
+    self._fixed_dwell_time = min_dwell_time == max_dwell_time
+    self._min_dwell_seconds = min_dwell_time.total_seconds()
+    self._max_dwell_seconds = max_dwell_time.total_seconds()
+
   def reset(self):
     pass
 
@@ -137,7 +150,7 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
       action: np.ndarray,
   ) -> List[microscope_utils.BeamControl]:
     """Gets simulator controls from the agent action."""
-    action = np.clip(action, -1.0, 1.0)
+    beam_position_action = np.clip(action[:2], -1.0, 1.0)
 
     silicon_position = graphene.get_silicon_positions(previous_observation.grid)
 
@@ -159,17 +172,38 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
         fov.upper_right.y - fov.lower_left.y
     )
     cell_radius = np.asarray([cell_radius_x, cell_radius_y])
-    control_position = silicon_position + (action * cell_radius)
+    control_position = silicon_position + (beam_position_action * cell_radius)
     control_position = np.clip(control_position, 0.0, 1.0)
+
+    if self._fixed_dwell_time:
+      dwell_time = dt.timedelta(seconds=self._min_dwell_seconds)
+    else:
+      dwell_time_action = np.clip(action[2], 0.0, 1.0)
+      dwell_range_seconds = self._max_dwell_seconds - self._min_dwell_seconds
+      dwell_time_seconds = (
+          dwell_time_action * dwell_range_seconds + self._min_dwell_seconds
+      )
+      dwell_time = dt.timedelta(seconds=dwell_time_seconds)
 
     return [
         microscope_utils.BeamControl(
-            geometry.Point(*control_position), dt.timedelta(seconds=1.5)
+            geometry.Point(*control_position), dwell_time
         )
     ]
 
   @property
   def action_spec(self) -> specs.BoundedArray:
-    return specs.BoundedArray(
-        shape=(2,), dtype=np.float32, minimum=-1.0, maximum=1.0
-    )
+    if self._fixed_dwell_time:
+      return specs.BoundedArray(
+          shape=(2,),
+          dtype=np.float32,
+          minimum=-1.0,
+          maximum=1.0,
+      )
+    else:
+      return specs.BoundedArray(
+          shape=(3,),
+          dtype=np.float32,
+          minimum=np.asarray([-1.0, -1.0, 0.0]),
+          maximum=np.asarray([1.0, 1.0, 1.0]),
+      )

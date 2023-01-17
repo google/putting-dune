@@ -28,7 +28,6 @@ from putting_dune import microscope_utils
 _ARBITRARY_CONTROL = microscope_utils.BeamControl(
     geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
 )
-_ARBITRARY_TIME = dt.timedelta(seconds=1.0)
 
 
 class GrapheneTest(absltest.TestCase):
@@ -169,7 +168,7 @@ class GrapheneTest(absltest.TestCase):
     atom_positions_before = np.copy(material.atom_positions)
     atomic_numbers_before = np.copy(material.atomic_numbers)
 
-    material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
+    material.apply_control(self.rng, _ARBITRARY_CONTROL)
     atom_positions_after = np.copy(material.atom_positions)
     atomic_numbers_after = np.copy(material.atomic_numbers)
 
@@ -192,7 +191,7 @@ class GrapheneTest(absltest.TestCase):
   ):
     material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
     material.reset(self.rng)
-    material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
+    material.apply_control(self.rng, _ARBITRARY_CONTROL)
 
     self.assertGreater(mock_rate_fn.call_count, 1)
 
@@ -206,7 +205,7 @@ class GrapheneTest(absltest.TestCase):
         rate_fn.return_value = np.full((3,), 0.1, dtype=np.float32)
         material = graphene.PristineSingleDopedGraphene(predict_rates=rate_fn)
         material.reset(self.rng)
-        material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
+        material.apply_control(self.rng, _ARBITRARY_CONTROL)
         low_rate_transitions = rate_fn.call_count
 
       # Get the number of transitions with a low rate.
@@ -215,7 +214,7 @@ class GrapheneTest(absltest.TestCase):
         rate_fn.return_value = np.full((3,), 2.0, dtype=np.float32)
         material = graphene.PristineSingleDopedGraphene(predict_rates=rate_fn)
         material.reset(self.rng)
-        material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
+        material.apply_control(self.rng, _ARBITRARY_CONTROL)
         high_rate_transitions = rate_fn.call_count
 
       high_rate_transitioned_more_than_low_rate.append(
@@ -251,7 +250,7 @@ class GrapheneTest(absltest.TestCase):
     )
     material.reset(self.rng)
 
-    material.apply_control(self.rng, _ARBITRARY_CONTROL, _ARBITRARY_TIME)
+    material.apply_control(self.rng, _ARBITRARY_CONTROL)
 
 
 if __name__ == '__main__':

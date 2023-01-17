@@ -121,7 +121,15 @@ class SimulatorTest(parameterized.TestCase):
 
     self.assertEqual(sim.material.apply_control.call_count, 2)
 
-  def test_simulator_progresses_time_correctly(self):
+  @mock.patch.object(
+      graphene,
+      'simple_transition_rates',
+      autospec=True,
+      # No events should ever happen, so we won't need to worry about
+      # two images being taken when the silicon approaches the FOV edge.
+      return_value=np.zeros((3,), dtype=np.float32),
+  )
+  def test_simulator_progresses_time_correctly(self, unused_rates_mock):
     time_per_control = [dt.timedelta(seconds=x) for x in (1.5, 3.0, 7.23)]
     controls = [
         microscope_utils.BeamControl(geometry.Point(0.5, 0.7), x)
@@ -130,13 +138,13 @@ class SimulatorTest(parameterized.TestCase):
     sim = simulator.PuttingDuneSimulator(self._material)
     sim.reset(self._rng)
 
-    sim.step_and_image(self._rng, controls)
+    simulator_observation = sim.step_and_image(self._rng, controls)
 
-    # Time of controls + 2 images, generated on reset and after the first step.
+    # Time of controls + 1 image taken after all controls are applied.
     predicted_elapsed_time = sum(time_per_control, start=dt.timedelta())
-    predicted_elapsed_time += 2 * sim._image_duration
+    predicted_elapsed_time += sim._image_duration
 
-    self.assertEqual(sim.elapsed_time, predicted_elapsed_time)
+    self.assertEqual(simulator_observation.elapsed_time, predicted_elapsed_time)
 
   def test_simulator_behaves_deterministically_with_seeded_components(self):
     observations = []
@@ -166,19 +174,13 @@ class SimulatorTest(parameterized.TestCase):
 
     sim.step_and_image(self._rng, [_ARBITRARY_CONTROL])
 
-    elapsed_time_before_reset = sim.elapsed_time
     atom_positions_before_reset = np.copy(sim.material.atom_positions)
     image_parameters_before_reset = sim._image_parameters
 
     sim.reset(self._rng)
 
-    elapsed_time_after_reset = sim.elapsed_time
     atom_positions_after_reset = np.copy(sim.material.atom_positions)
     image_parameters_after_reset = sim._image_parameters
-
-    # Check elapsed time was reset correctly.
-    self.assertNotEqual(elapsed_time_after_reset, elapsed_time_before_reset)
-    self.assertEqual(elapsed_time_after_reset, sim._image_duration)
 
     # Check the material was reinitialized.
     # Note: We do not compare atomic numbers, since there is a pretty good

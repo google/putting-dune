@@ -165,7 +165,6 @@ class Material(abc.ABC):
       self,
       rng: np.random.Generator,
       control: microscope_utils.BeamControl,
-      start_time: dt.timedelta,
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates controls applied to the material."""
@@ -329,7 +328,6 @@ class PristineSingleDopedGraphene(Material):
       self,
       rng: np.random.Generator,
       control: microscope_utils.BeamControl,
-      start_time: dt.timedelta,
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates applying a beam exposure to the material."""

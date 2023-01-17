@@ -64,7 +64,7 @@ def create_single_silicon_observation(
       grid=grid,
       fov=fov,
       controls=(),
-      elapsed_time=dt.timedelta(seconds=0),
+      elapsed_time=dt.timedelta(seconds=1.5),
       image=image,
   )
 

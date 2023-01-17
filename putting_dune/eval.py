@@ -76,6 +76,14 @@ def main(args: Args) -> None:
       'Average seconds to goal: %.2f', aggregate_results.average_seconds_to_goal
   )
   logging.info(
+      'Average agent seconds to goal: %.2f',
+      aggregate_results.average_agent_seconds_to_goal,
+  )
+  logging.info(
+      'Average environment seconds to goal: %.2f',
+      aggregate_results.average_environment_seconds_to_goal,
+  )
+  logging.info(
       'Average total reward: %.2f', aggregate_results.average_total_reward
   )
 

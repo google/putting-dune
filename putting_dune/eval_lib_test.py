@@ -50,6 +50,10 @@ class EvalLibTest(absltest.TestCase):
 
   def test_eval_lib_runs_for_correct_number_of_seeds(self):
     self._mock_environment.step.return_value = _TERMINAL_STEP
+    # Required by eval_lib.evaluate to get elapsed time.
+    self._mock_environment.last_microscope_observation = (
+        test_utils.create_single_silicon_observation(np.random.default_rng(0))
+    )
 
     num_seeds = 10
     eval_suite = eval_lib.EvalSuite(tuple(range(num_seeds)))
@@ -90,21 +94,24 @@ class EvalLibTest(absltest.TestCase):
             seed=0,
             reached_goal=True,
             num_actions_taken=10,
-            seconds_to_goal=5.0,
+            agent_seconds_to_goal=2.0,
+            environment_seconds_to_goal=3.0,
             total_reward=50.0,
         ),
         eval_lib.EvalResult(
             seed=1,
             reached_goal=True,
             num_actions_taken=13,
-            seconds_to_goal=6.5,
+            agent_seconds_to_goal=3.0,
+            environment_seconds_to_goal=3.5,
             total_reward=35.0,
         ),
         eval_lib.EvalResult(
             seed=2,
             reached_goal=False,
             num_actions_taken=100,
-            seconds_to_goal=500.0,
+            agent_seconds_to_goal=212.0,
+            environment_seconds_to_goal=288.0,
             total_reward=0.0,
         ),
     ]
@@ -115,6 +122,10 @@ class EvalLibTest(absltest.TestCase):
         aggregate_results.average_num_times_reached_goal, 2 / 3
     )
     self.assertAlmostEqual(aggregate_results.average_num_actions_taken, 11.5)
+    self.assertAlmostEqual(aggregate_results.average_agent_seconds_to_goal, 2.5)
+    self.assertAlmostEqual(
+        aggregate_results.average_environment_seconds_to_goal, 3.25
+    )
     self.assertAlmostEqual(aggregate_results.average_seconds_to_goal, 5.75)
     self.assertAlmostEqual(aggregate_results.average_total_reward, 42.5)
 

@@ -16,7 +16,7 @@
 """Putting Dune simulator."""
 
 import datetime as dt
-from typing import Sequence
+from typing import Sequence, Tuple
 
 import numpy as np
 from putting_dune import geometry
@@ -60,7 +60,6 @@ class PuttingDuneSimulator:
     self._fov_scale: float
     self._fov: microscope_utils.MicroscopeFieldOfView
     self._image_parameters: imaging.ImageGenerationParameters
-    self.elapsed_time: dt.timedelta
 
   def reset(
       self,
@@ -81,11 +80,10 @@ class PuttingDuneSimulator:
         geometry.Point(silicon_position + self._fov_scale / 2.0),
     )
 
-    self.elapsed_time = dt.timedelta(seconds=0)
     for observer in self._observers:
       observer.observe_reset(self.material.atomic_grid, self._fov)
 
-    observed_grid = self._get_observed_grid()
+    observed_grid, elapsed_time = self._get_observed_grid_and_elapsed_time()
 
     # We always generate image parameters in case an image is
     # requested in a subsequent call to step_and_image.
@@ -100,7 +98,7 @@ class PuttingDuneSimulator:
         grid=observed_grid,
         fov=self._fov,
         controls=(),
-        elapsed_time=self.elapsed_time,
+        elapsed_time=elapsed_time,
         image=observed_image,
     )
 
@@ -128,6 +126,9 @@ class PuttingDuneSimulator:
       RuntimeError: If called before reset.
     """
     self._assert_has_been_reset('step_and_image')
+    elapsed_time = dt.timedelta(seconds=0)
+
+    # Apply each control.
     for control in controls:
       # Convert the control from the microscope frame to material frame.
       # TODO(joshgreaves): Control clipping to [0, 1]?
@@ -141,14 +142,15 @@ class PuttingDuneSimulator:
       for observer in self._observers:
         observer.observe_apply_control(control)
 
-      self.material.apply_control(
-          rng, control, self.elapsed_time, self._observers
-      )
+      self.material.apply_control(rng, control, self._observers)
 
-      self.elapsed_time += control.dwell_time
+      elapsed_time += control.dwell_time
 
-    observed_grid = self._get_observed_grid()
+    # Take an image, advancing the clock.
+    observed_grid, image_time = self._get_observed_grid_and_elapsed_time()
+    elapsed_time += image_time
 
+    # Ensure there is a silicon still in view, and maybe readjust the fov.
     observed_silicon_positions = graphene.get_silicon_positions(observed_grid)
     assert observed_silicon_positions.shape == (1, 2)
     observed_silicon_position = observed_silicon_positions.reshape(-1)
@@ -167,7 +169,8 @@ class PuttingDuneSimulator:
           geometry.Point(silicon_position - self._fov_scale / 2.0),
           geometry.Point(silicon_position + self._fov_scale / 2.0),
       )
-      observed_grid = self._get_observed_grid()
+      observed_grid, image_time = self._get_observed_grid_and_elapsed_time()
+      elapsed_time += image_time
 
     # Render the new image, if it is required.
     observed_image = None
@@ -178,7 +181,7 @@ class PuttingDuneSimulator:
         grid=observed_grid,
         fov=self._fov,
         controls=tuple(controls),
-        elapsed_time=self.elapsed_time,
+        elapsed_time=elapsed_time,
         image=observed_image,
     )
 
@@ -190,7 +193,9 @@ class PuttingDuneSimulator:
   ) -> None:
     self._observers.remove(observer)
 
-  def _get_observed_grid(self) -> microscope_utils.AtomicGrid:
+  def _get_observed_grid_and_elapsed_time(
+      self,
+  ) -> Tuple[microscope_utils.AtomicGrid, dt.timedelta]:
     """Gets the atomic grid of all atoms in the field of view."""
     # Note: Currently we do not expect atoms/defects to diffuse through
     # the graphene sheet during an image capture. However, if this changes,
@@ -206,9 +211,7 @@ class PuttingDuneSimulator:
           fov=self._fov,
       )
 
-    self.elapsed_time += self._image_duration
-
-    return observation
+    return observation, self._image_duration
 
   def _generate_image(
       self, observed_grid: microscope_utils.AtomicGrid, rng: np.random.Generator
