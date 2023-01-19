@@ -16,8 +16,10 @@
 """Image generators for STEM."""
 
 import dataclasses
+from typing import Tuple
 
 import numpy as np
+from putting_dune import constants
 from putting_dune import microscope_utils
 from scipy import ndimage
 from skimage import exposure
@@ -26,6 +28,7 @@ import skimage.util
 
 @dataclasses.dataclass(frozen=True)
 class ImageGenerationParameters:
+  intensity_exponent: float
   gaussian_variance: float
   jitter_rate: float
   poisson_rate_multiplier: float
@@ -36,6 +39,7 @@ class ImageGenerationParameters:
 
 def sample_image_parameters(rng: np.random.Generator):
   return ImageGenerationParameters(
+      intensity_exponent=rng.uniform(1.4, 2.0),
       gaussian_variance=rng.uniform(0.0, 5e-3),
       jitter_rate=rng.uniform(0.0, 5.0),
       poisson_rate_multiplier=rng.exponential(2) + 0.5,
@@ -45,9 +49,53 @@ def sample_image_parameters(rng: np.random.Generator):
   )
 
 
+def generate_grid_mask(
+    grid: microscope_utils.AtomicGrid,
+    fov: microscope_utils.MicroscopeFieldOfView,
+    *,
+    intensity_exponent: float = 1.7,
+    image_dimensions: Tuple[int, int] = (512, 512),
+) -> np.ndarray:
+  """Generates a semantic mask for an atomic grid."""
+  width, height = image_dimensions
+
+  # Get the x and y location of the center of each pixel.
+  xs = np.linspace(
+      fov.lower_left.x, fov.upper_right.x, width + 1, endpoint=True
+  )
+  xs = (xs[:-1] + xs[1:]) / 2
+
+  ys = np.linspace(
+      fov.lower_left.y, fov.upper_right.y, height + 1, endpoint=True
+  )
+  ys = (ys[:-1] + ys[1:]) / 2
+
+  xx, yy = np.meshgrid(xs, ys)
+
+  # We need to work with a grid in the material frame to work out distances
+  # in angstroms.
+  material_grid = fov.microscope_frame_to_material_frame(grid)
+  mask = np.zeros(image_dimensions, dtype=np.uint8)
+
+  for pos, atomic_number in zip(
+      material_grid.atom_positions, material_grid.atomic_numbers
+  ):
+    # The intensity exponent effects how large the mask for the atom is.
+    # Empirically, multiplying by 0.1 gives a reasonable sized mask for
+    # each atom.
+    radius = (atomic_number / constants.CARBON) ** intensity_exponent * 0.1
+    distance = (xx - pos[0]) ** 2.0 + (yy - pos[1]) ** 2.0
+    mask[distance < radius] = atomic_number
+
+  mask = np.flipud(mask)
+  return mask
+
+
 def generate_clean_image(
     grid: microscope_utils.AtomicGrid,
     fov: microscope_utils.MicroscopeFieldOfView,
+    *,
+    intensity_exponent: float = 1.7,
 ) -> np.ndarray:
   """Generates a clean image for an atomic grid."""
   # TODO(joshgreaves): Explore adding randomness to this function.
@@ -64,7 +112,7 @@ def generate_clean_image(
         density=False,
     )
 
-    image = image + intensities * atomic_number**2
+    image = image + intensities * atomic_number**intensity_exponent
 
   # np.histogram2d returns results transposed when compared to what we expect.
   # The documentation states:

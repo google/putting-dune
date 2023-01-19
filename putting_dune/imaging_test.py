@@ -74,6 +74,30 @@ class ImagingTest(absltest.TestCase):
     self.assertLessEqual(stem_image.max(), 1.0)
     self.assertGreaterEqual(stem_image.min(), 0.0)
 
+  def test_generate_grid_mask_generates_an_array(self):
+    # This has mostly been tested in a colab notebook, since we can
+    # visually inspect the images there.
+    rng = np.random.default_rng(0)
+    material = graphene.PristineSingleDopedGraphene()
+    material.reset(rng)
+    silicon_position = material.get_silicon_position()
+
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point(silicon_position - 10.0),
+        upper_right=geometry.Point(silicon_position + 10.0),
+    )
+    grid = material.get_atoms_in_bounds(
+        fov.lower_left,
+        fov.upper_right,
+    )
+
+    mask = imaging.generate_grid_mask(grid, fov)
+    atomic_numbers = set(mask.reshape(-1))
+
+    self.assertIsInstance(mask, np.ndarray)
+    self.assertEqual(mask.shape, (512, 512))
+    self.assertLen(atomic_numbers, 3)  # C, Si, and None.
+
 
 if __name__ == '__main__':
   absltest.main()
