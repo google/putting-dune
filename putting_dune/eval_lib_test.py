@@ -129,6 +129,18 @@ class EvalLibTest(absltest.TestCase):
     self.assertAlmostEqual(aggregate_results.average_seconds_to_goal, 5.75)
     self.assertAlmostEqual(aggregate_results.average_total_reward, 42.5)
 
+  def test_results_correctly_compute_total_time(self):
+    result = eval_lib.EvalResult(
+        seed=0,
+        reached_goal=True,
+        num_actions_taken=10,
+        agent_seconds_to_goal=0.7,
+        environment_seconds_to_goal=18.9,
+        total_reward=50.0,
+    )
+
+    self.assertEqual(result.seconds_to_goal, 18.9 + 0.7)
+
 
 if __name__ == '__main__':
   absltest.main()
