@@ -25,8 +25,10 @@ from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
 
-_ARBITRARY_CONTROL = microscope_utils.BeamControl(
-    geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+_ARBITRARY_CONTROL = microscope_utils.BeamControlMaterialFrame(
+    microscope_utils.BeamControl(
+        geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+    )
 )
 
 

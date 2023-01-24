@@ -29,8 +29,10 @@ from putting_dune import simulator
 from putting_dune import simulator_observers
 
 
-_ARBITRARY_CONTROL = microscope_utils.BeamControl(
-    geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+_ARBITRARY_CONTROL = microscope_utils.BeamControlMicroscopeFrame(
+    microscope_utils.BeamControl(
+        geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+    )
 )
 _ARBITRARY_GRID = microscope_utils.AtomicGrid(
     np.arange(10, dtype=np.float32).reshape(5, 2),
@@ -89,8 +91,10 @@ class SimulatorTest(parameterized.TestCase):
     # Mock the material to inspect calls to it.
     sim.material = _get_mock_material(sim.material, sim._fov)
 
-    control = microscope_utils.BeamControl(
-        control_position, dt.timedelta(seconds=1.5)
+    control = microscope_utils.BeamControlMicroscopeFrame(
+        microscope_utils.BeamControl(
+            control_position, dt.timedelta(seconds=1.5)
+        )
     )
     sim.step_and_image(self._rng, [control])
 
@@ -110,11 +114,15 @@ class SimulatorTest(parameterized.TestCase):
     sim.material = _get_mock_material(sim.material, sim._fov)
 
     controls = [
-        microscope_utils.BeamControl(
-            geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+        microscope_utils.BeamControlMicroscopeFrame(
+            microscope_utils.BeamControl(
+                geometry.Point(0.5, 0.7), dt.timedelta(seconds=1.0)
+            )
         ),
-        microscope_utils.BeamControl(
-            geometry.Point(0.6, 0.8), dt.timedelta(seconds=1.0)
+        microscope_utils.BeamControlMicroscopeFrame(
+            microscope_utils.BeamControl(
+                geometry.Point(0.6, 0.8), dt.timedelta(seconds=1.0)
+            )
         ),
     ]
     sim.step_and_image(self._rng, controls)
@@ -131,10 +139,13 @@ class SimulatorTest(parameterized.TestCase):
   )
   def test_simulator_progresses_time_correctly(self, unused_rates_mock):
     time_per_control = [dt.timedelta(seconds=x) for x in (1.5, 3.0, 7.23)]
-    controls = [
-        microscope_utils.BeamControl(geometry.Point(0.5, 0.7), x)
-        for x in time_per_control
-    ]
+    controls = []
+    for x in time_per_control:
+      controls.append(
+          microscope_utils.BeamControlMicroscopeFrame(
+              microscope_utils.BeamControl(geometry.Point(0.5, 0.7), x)
+          )
+      )
     sim = simulator.PuttingDuneSimulator(self._material)
     sim.reset(self._rng)
 
@@ -280,8 +291,10 @@ class SimulatorTest(parameterized.TestCase):
     obs = sim.step_and_image(
         self._rng,
         [
-            microscope_utils.BeamControl(
-                geometry.Point((1.0, 1.0)), dt.timedelta(seconds=0.0)
+            microscope_utils.BeamControlMicroscopeFrame(
+                microscope_utils.BeamControl(
+                    geometry.Point((1.0, 1.0)), dt.timedelta(seconds=0.0)
+                )
             )
         ],
     )

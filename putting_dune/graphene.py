@@ -40,7 +40,7 @@ def single_silicon_prior_rates(
 
 
 def simple_transition_rates(
-    grid: microscope_utils.AtomicGrid,
+    grid: microscope_utils.AtomicGridMaterialFrame,
     beam_pos: geometry.Point,
     current_position: np.ndarray,
     neighbor_indices: np.ndarray,
@@ -99,7 +99,7 @@ class HumanPriorRatePredictor:
 
   def predict(
       self,
-      grid: microscope_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGridMaterialFrame,
       beam_pos: geometry.Point,
       current_position: np.ndarray,
       neighbor_indices: np.ndarray,
@@ -143,7 +143,7 @@ class Material(abc.ABC):
   @abc.abstractmethod
   def get_atoms_in_bounds(
       self, lower_left: geometry.Point, upper_right: geometry.Point
-  ) -> microscope_utils.AtomicGrid:
+  ) -> microscope_utils.AtomicGridMicroscopeFrame:
     """Gets the atomic grid for a particular field of view.
 
     Args:
@@ -164,14 +164,14 @@ class Material(abc.ABC):
   def apply_control(
       self,
       rng: np.random.Generator,
-      control: microscope_utils.BeamControl,
+      control: microscope_utils.BeamControlMaterialFrame,
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates controls applied to the material."""
 
   @property
   @abc.abstractmethod
-  def atomic_grid(self) -> microscope_utils.AtomicGrid:
+  def atomic_grid(self) -> microscope_utils.AtomicGridMaterialFrame:
     """Gets the atomic grid representing the current material state."""
 
 
@@ -220,7 +220,12 @@ def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
 # 3 nearest neighbors, and returns the rate at which the silicon atom
 # swaps places with its nearest neighbors.
 RatePredictionFn = Callable[
-    [microscope_utils.AtomicGrid, geometry.Point, np.ndarray, np.ndarray],
+    [
+        microscope_utils.AtomicGridMaterialFrame,
+        geometry.Point,
+        np.ndarray,
+        np.ndarray,
+    ],
     np.ndarray,
 ]
 
@@ -284,7 +289,7 @@ class PristineSingleDopedGraphene(Material):
 
   def get_atoms_in_bounds(
       self, lower_left: geometry.Point, upper_right: geometry.Point
-  ) -> microscope_utils.AtomicGrid:
+  ) -> microscope_utils.AtomicGridMicroscopeFrame:
     """Gets the atomic grid for a particular field of view.
 
     Args:
@@ -320,14 +325,16 @@ class PristineSingleDopedGraphene(Material):
         selected_atom_positions - lower_left.reshape(1, -1)
     ) / delta
 
-    return microscope_utils.AtomicGrid(
-        selected_atom_positions, selected_atomic_numbers
+    return microscope_utils.AtomicGridMicroscopeFrame(
+        microscope_utils.AtomicGrid(
+            selected_atom_positions, selected_atomic_numbers
+        )
     )
 
   def apply_control(
       self,
       rng: np.random.Generator,
-      control: microscope_utils.BeamControl,
+      control: microscope_utils.BeamControlMaterialFrame,
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates applying a beam exposure to the material."""
@@ -347,7 +354,7 @@ class PristineSingleDopedGraphene(Material):
       si_neighbors_index = si_neighbors_index[0, 1:]
 
       transition_rates = self._predict_rates(
-          microscope_utils.AtomicGrid(self.atom_positions, self.atomic_numbers),
+          self.atomic_grid,
           control.position,
           silicon_position,
           si_neighbors_index,
@@ -386,11 +393,13 @@ class PristineSingleDopedGraphene(Material):
           )
 
   @property
-  def atomic_grid(self) -> microscope_utils.AtomicGrid:
+  def atomic_grid(self) -> microscope_utils.AtomicGridMaterialFrame:
     """Gets the atomic grid representing the current material state."""
     self._assert_has_been_reset('atomic_grid')
-    return microscope_utils.AtomicGrid(
-        self.atom_positions, np.copy(self.atomic_numbers)
+    return microscope_utils.AtomicGridMaterialFrame(
+        microscope_utils.AtomicGrid(
+            self.atom_positions, np.copy(self.atomic_numbers)
+        )
     )
 
   def get_silicon_position(self) -> np.ndarray:

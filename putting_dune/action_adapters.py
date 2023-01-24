@@ -42,7 +42,7 @@ class ActionAdapter(abc.ABC):
       self,
       previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
-  ) -> List[microscope_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControlMicroscopeFrame]:
     """Gets simulator controls from the agent action."""
 
   @property
@@ -62,16 +62,18 @@ class DirectActionAdapter(ActionAdapter):
       self,
       previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
-  ) -> List[microscope_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControlMicroscopeFrame]:
     """Gets simulator controls from the agent action."""
     del previous_observation  # Unused.
 
     action = np.clip(action, 0.0, 1.0)
     # TODO(joshgreaves): Choose/parameterize dwell time.
     return [
-        microscope_utils.BeamControl(
-            position=geometry.Point(action),
-            dwell_time=dt.timedelta(seconds=1.5),
+        microscope_utils.BeamControlMicroscopeFrame(
+            microscope_utils.BeamControl(
+                position=geometry.Point(action),
+                dwell_time=dt.timedelta(seconds=1.5),
+            )
         )
     ]
 
@@ -101,7 +103,7 @@ class DeltaPositionActionAdapter(ActionAdapter):
       self,
       previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
-  ) -> List[microscope_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControlMicroscopeFrame]:
     del previous_observation  # Unused.
 
     self.beam_pos += action
@@ -110,10 +112,12 @@ class DeltaPositionActionAdapter(ActionAdapter):
     self.beam_pos = np.clip(self.beam_pos, 0.0, 1.0)
 
     return [
-        microscope_utils.BeamControl(
-            geometry.Point(self.beam_pos[0], self.beam_pos[1]),
-            # TODO(joshgreaves): Choose/parameterize dwell time.
-            dt.timedelta(seconds=1.5),
+        microscope_utils.BeamControlMicroscopeFrame(
+            microscope_utils.BeamControl(
+                geometry.Point(self.beam_pos[0], self.beam_pos[1]),
+                # TODO(joshgreaves): Choose/parameterize dwell time.
+                dt.timedelta(seconds=1.5),
+            )
         )
     ]
 
@@ -148,7 +152,7 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
       self,
       previous_observation: microscope_utils.MicroscopeObservation,
       action: np.ndarray,
-  ) -> List[microscope_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControlMicroscopeFrame]:
     """Gets simulator controls from the agent action."""
     beam_position_action = np.clip(action[:2], -1.0, 1.0)
 
@@ -186,8 +190,10 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
       dwell_time = dt.timedelta(seconds=dwell_time_seconds)
 
     return [
-        microscope_utils.BeamControl(
-            geometry.Point(*control_position), dwell_time
+        microscope_utils.BeamControlMicroscopeFrame(
+            microscope_utils.BeamControl(
+                geometry.Point(*control_position), dwell_time
+            )
         )
     ]
 

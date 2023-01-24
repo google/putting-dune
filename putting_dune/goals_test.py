@@ -94,9 +94,11 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
     self.assertEqual(silicon_position.shape, (1, 2))
     obs = microscope_utils.MicroscopeObservation(
         # Put the silicon right in the center of the fov for convenience.
-        grid=microscope_utils.AtomicGrid(
-            atom_positions=obs.grid.atom_positions - silicon_position + 0.5,
-            atomic_numbers=obs.grid.atomic_numbers,
+        grid=microscope_utils.AtomicGridMicroscopeFrame(
+            microscope_utils.AtomicGrid(
+                atom_positions=obs.grid.atom_positions - silicon_position + 0.5,
+                atomic_numbers=obs.grid.atomic_numbers,
+            )
         ),
         fov=microscope_utils.MicroscopeFieldOfView(
             lower_left=geometry.Point(

@@ -56,7 +56,9 @@ class PuttingDuneEnvironment(dm_env.Environment):
 
     # Variables that will be set on reset.
     self.last_microscope_observation = microscope_utils.MicroscopeObservation(
-        microscope_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14])),
+        microscope_utils.AtomicGridMicroscopeFrame(
+            microscope_utils.AtomicGrid(np.zeros((1, 2)), np.asarray([14]))
+        ),
         microscope_utils.MicroscopeFieldOfView(
             geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
         ),

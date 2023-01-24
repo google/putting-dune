@@ -154,9 +154,13 @@ class ActionAdaptersTest(parameterized.TestCase):
     # Shift the observed grid so the silicon is in the specified position.
     # Initially, the silicon is at (0.5, 0.5).
     observation = test_utils.create_single_silicon_observation(self.rng)
-    shifted_grid = microscope_utils.AtomicGrid(
-        atom_positions=observation.grid.atom_positions + silicon_position - 0.5,
-        atomic_numbers=observation.grid.atomic_numbers,
+    shifted_grid = microscope_utils.AtomicGridMicroscopeFrame(
+        microscope_utils.AtomicGrid(
+            atom_positions=(
+                observation.grid.atom_positions + silicon_position - 0.5
+            ),
+            atomic_numbers=observation.grid.atomic_numbers,
+        )
     )
     observation = microscope_utils.MicroscopeObservation(
         grid=shifted_grid,

@@ -35,25 +35,34 @@ _FOV = microscope_utils.MicroscopeFieldOfView(
     upper_right=geometry.Point((3.2, -2.8)),
 )
 _OBSERVATION = microscope_utils.MicroscopeObservation(
-    grid=_ATOMIC_GRID,
+    grid=microscope_utils.AtomicGridMicroscopeFrame(_ATOMIC_GRID),
     fov=_FOV,
-    controls=(_BEAM_CONTROL, _BEAM_CONTROL),
+    controls=(
+        microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
+        microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
+    ),
     elapsed_time=dt.timedelta(seconds=6),
     image=np.ones((2, 2, 1)),
 )
 _OBSERVATION_WITHOUT_IMAGE = microscope_utils.MicroscopeObservation(
-    grid=_ATOMIC_GRID,
+    grid=microscope_utils.AtomicGridMicroscopeFrame(_ATOMIC_GRID),
     fov=_FOV,
-    controls=(_BEAM_CONTROL, _BEAM_CONTROL),
+    controls=(
+        microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
+        microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
+    ),
     elapsed_time=dt.timedelta(seconds=6),
     image=None,
 )
 _TRANSITION = microscope_utils.Transition(
-    grid_before=_ATOMIC_GRID,
-    grid_after=_ATOMIC_GRID,
+    grid_before=microscope_utils.AtomicGridMicroscopeFrame(_ATOMIC_GRID),
+    grid_after=microscope_utils.AtomicGridMicroscopeFrame(_ATOMIC_GRID),
     fov_before=_FOV,
     fov_after=_FOV,
-    controls=(_BEAM_CONTROL, _BEAM_CONTROL),
+    controls=(
+        microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
+        microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
+    ),
 )
 _TRAJECTORY = microscope_utils.Trajectory(
     observations=[_OBSERVATION, _OBSERVATION_WITHOUT_IMAGE],
@@ -102,12 +111,16 @@ class SimulatorUtilsTest(absltest.TestCase):
         lower_left=geometry.Point((-5.0, 0.0)),
         upper_right=geometry.Point((5.0, 20.0)),
     )
-    grid_before = microscope_utils.AtomicGrid(
-        atom_positions=np.asarray([[0.5, 1.0], [-3.0, 2.5]]),
-        atomic_numbers=np.zeros(2),  # Unimportant.
+    microscope_grid_before = microscope_utils.AtomicGridMicroscopeFrame(
+        microscope_utils.AtomicGrid(
+            atom_positions=np.asarray([[0.5, 1.0], [-3.0, 2.5]]),
+            atomic_numbers=np.zeros(2),  # Unimportant.
+        )
     )
 
-    material_grid = fov.microscope_frame_to_material_frame(grid_before)
+    material_grid = fov.microscope_frame_to_material_frame(
+        microscope_grid_before
+    )
     microscope_grid = fov.material_frame_to_microscope_frame(material_grid)
 
     with self.subTest('microscope_to_material'):
@@ -115,10 +128,11 @@ class SimulatorUtilsTest(absltest.TestCase):
       np.testing.assert_allclose(
           material_grid.atom_positions, np.asarray([[0.0, 20.0], [-35.0, 50.0]])
       )
+
     with self.subTest('material_to_microscope'):
       self.assertIsInstance(microscope_grid, microscope_utils.AtomicGrid)
       np.testing.assert_allclose(
-          microscope_grid.atom_positions, grid_before.atom_positions
+          microscope_grid.atom_positions, microscope_grid_before.atom_positions
       )
 
   def test_fov_converts_ndarray_frames_of_reference(self):
@@ -165,8 +179,9 @@ class SimulatorUtilsTest(absltest.TestCase):
     # we use it here to make this test much shorted (and easier to follow).
     trajectory_proto = _TRAJECTORY.to_proto()
     trajectory = microscope_utils.Trajectory.from_proto(trajectory_proto)
-    for observation, converted_observation in zip(_TRAJECTORY.observations,
-                                                  trajectory.observations):
+    for observation, converted_observation in zip(
+        _TRAJECTORY.observations, trajectory.observations
+    ):
       # Compare grids.
       with self.subTest('grids'):
         np.testing.assert_array_equal(
@@ -218,6 +233,7 @@ class SimulatorUtilsTest(absltest.TestCase):
           np.testing.assert_allclose(
               observation.image, converted_observation.image
           )
+
 
 
 if __name__ == '__main__':

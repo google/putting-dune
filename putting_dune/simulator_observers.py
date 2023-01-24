@@ -55,7 +55,7 @@ class EventObserver(microscope_utils.SimulatorObserver):
 
   def observe_reset(
       self,
-      grid: microscope_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGridMaterialFrame,
       fov: microscope_utils.MicroscopeFieldOfView,
   ) -> None:
     event = SimulatorEvent(
@@ -67,7 +67,7 @@ class EventObserver(microscope_utils.SimulatorObserver):
   def observe_transition(
       self,
       time_since_control_was_applied: dt.timedelta,
-      grid: microscope_utils.AtomicGrid,
+      grid: microscope_utils.AtomicGridMaterialFrame,
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.TRANSITION,
@@ -79,7 +79,7 @@ class EventObserver(microscope_utils.SimulatorObserver):
     self.events.append(event)
 
   def observe_apply_control(
-      self, control: microscope_utils.BeamControl
+      self, control: microscope_utils.BeamControlMaterialFrame
   ) -> None:
     event = SimulatorEvent(
         SimulatorEventType.APPLY_CONTROL,

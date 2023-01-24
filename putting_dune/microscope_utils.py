@@ -18,7 +18,7 @@
 import dataclasses
 import datetime as dt
 import typing
-from typing import Tuple, Sequence, Optional
+from typing import NewType, Tuple, Sequence, Optional
 
 import numpy as np
 from putting_dune import geometry
@@ -39,6 +39,9 @@ class AtomicGrid:
     return AtomicGrid(shifted_atom_positions, self.atomic_numbers)
 
 
+AtomicGridMaterialFrame = NewType('AtomicGridMaterialFrame', AtomicGrid)
+AtomicGridMicroscopeFrame = NewType('AtomicGridMicroscopeFrame', AtomicGrid)
+
 
 @dataclasses.dataclass(frozen=True)
 class BeamControl:
@@ -58,6 +61,10 @@ class BeamControl:
     )
     return BeamControl(shifted_position, self.dwell_time)
 
+
+
+BeamControlMaterialFrame = NewType('BeamControlMaterialFrame', BeamControl)
+BeamControlMicroscopeFrame = NewType('BeamControlMicroscopeFrame', BeamControl)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -113,7 +120,9 @@ class MicroscopeFieldOfView:
     ...
 
   @typing.overload
-  def microscope_frame_to_material_frame(self, point: AtomicGrid) -> AtomicGrid:
+  def microscope_frame_to_material_frame(
+      self, point: AtomicGridMicroscopeFrame
+  ) -> AtomicGridMaterialFrame:
     ...
 
   def microscope_frame_to_material_frame(self, point):
@@ -124,8 +133,10 @@ class MicroscopeFieldOfView:
 
     if isinstance(point, AtomicGrid):
       grid = typing.cast(AtomicGrid, point)
-      return AtomicGrid(
-          grid.atom_positions * scale + lower_left, grid.atomic_numbers
+      return AtomicGridMaterialFrame(
+          AtomicGrid(
+              grid.atom_positions * scale + lower_left, grid.atomic_numbers
+          )
       )
     elif isinstance(point, np.ndarray):
       point = typing.cast(np.ndarray, point)
@@ -151,7 +162,9 @@ class MicroscopeFieldOfView:
     ...
 
   @typing.overload
-  def material_frame_to_microscope_frame(self, point: AtomicGrid) -> AtomicGrid:
+  def material_frame_to_microscope_frame(
+      self, point: AtomicGridMaterialFrame
+  ) -> AtomicGridMicroscopeFrame:
     ...
 
   def material_frame_to_microscope_frame(self, point):
@@ -162,8 +175,10 @@ class MicroscopeFieldOfView:
 
     if isinstance(point, AtomicGrid):
       grid = typing.cast(AtomicGrid, point)
-      return AtomicGrid(
-          (grid.atom_positions - lower_left) / scale, grid.atomic_numbers
+      return AtomicGridMicroscopeFrame(
+          AtomicGrid(
+              (grid.atom_positions - lower_left) / scale, grid.atomic_numbers
+          )
       )
     elif isinstance(point, np.ndarray):
       point = typing.cast(np.ndarray, point)
@@ -188,14 +203,18 @@ class MicroscopeFieldOfView:
 class SimulatorObserver:
   """An observer interface for observing events in the simulator."""
 
-  def observe_reset(self, grid: AtomicGrid, fov: MicroscopeFieldOfView) -> None:
+  def observe_reset(
+      self, grid: AtomicGridMaterialFrame, fov: MicroscopeFieldOfView
+  ) -> None:
     pass
 
-  def observe_apply_control(self, control: BeamControl) -> None:
+  def observe_apply_control(self, control: BeamControlMaterialFrame) -> None:
     pass
 
   def observe_transition(
-      self, time_since_control_was_applied: dt.timedelta, grid: AtomicGrid
+      self,
+      time_since_control_was_applied: dt.timedelta,
+      grid: AtomicGridMaterialFrame,
   ) -> None:
     pass
 
@@ -217,9 +236,9 @@ class SimulatorObserver:
 class MicroscopeObservation:
   """An observation from interacting with a microscope."""
 
-  grid: AtomicGrid
+  grid: AtomicGridMicroscopeFrame
   fov: MicroscopeFieldOfView
-  controls: Tuple[BeamControl, ...]
+  controls: Tuple[BeamControlMicroscopeFrame, ...]
   elapsed_time: dt.timedelta
   image: Optional[np.ndarray] = None
 
@@ -237,11 +256,11 @@ class Transition:
     controls: Beam controls applied during the transition.
   """
 
-  grid_before: AtomicGrid
-  grid_after: AtomicGrid
+  grid_before: AtomicGridMicroscopeFrame
+  grid_after: AtomicGridMicroscopeFrame
   fov_before: MicroscopeFieldOfView
   fov_after: MicroscopeFieldOfView
-  controls: Tuple[BeamControl, ...]
+  controls: Tuple[BeamControlMicroscopeFrame, ...]
 
 
 

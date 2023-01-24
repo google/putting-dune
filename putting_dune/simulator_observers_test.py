@@ -29,14 +29,18 @@ class SimulatorObserversTest(absltest.TestCase):
   def test_event_observer_tracks_events_correctly(self):
     observer = simulator_observers.EventObserver()
 
-    grid = microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    grid = microscope_utils.AtomicGridMaterialFrame(
+        microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    )
     fov = microscope_utils.MicroscopeFieldOfView(
         geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
     )
     observer.observe_reset(grid, fov)
     observer.observe_apply_control(
-        microscope_utils.BeamControl(
-            geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)
+        microscope_utils.BeamControlMaterialFrame(
+            microscope_utils.BeamControl(
+                geometry.Point(1.0, 1.0), dt.timedelta(seconds=1.0)
+            )
         ),
     )
     observer.observe_transition(dt.timedelta(seconds=0.2), grid)
@@ -64,7 +68,9 @@ class SimulatorObserversTest(absltest.TestCase):
 
   def test_event_observer_reset_resets_events(self):
     observer = simulator_observers.EventObserver()
-    grid = microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    grid = microscope_utils.AtomicGridMaterialFrame(
+        microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
+    )
     fov = microscope_utils.MicroscopeFieldOfView(
         geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
     )

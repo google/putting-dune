@@ -105,7 +105,7 @@ class PuttingDuneSimulator:
   def step_and_image(
       self,
       rng: np.random.Generator,
-      controls: Sequence[microscope_utils.BeamControl],
+      controls: Sequence[microscope_utils.BeamControlMicroscopeFrame],
       return_image: bool = False,
   ) -> microscope_utils.MicroscopeObservation:
     """Update simulator state based on beam position delta.
@@ -135,8 +135,8 @@ class PuttingDuneSimulator:
       control_position = self._fov.microscope_frame_to_material_frame(
           control.position
       )
-      control = microscope_utils.BeamControl(
-          control_position, control.dwell_time
+      control = microscope_utils.BeamControlMaterialFrame(
+          microscope_utils.BeamControl(control_position, control.dwell_time)
       )
 
       for observer in self._observers:
@@ -195,7 +195,7 @@ class PuttingDuneSimulator:
 
   def _get_observed_grid_and_elapsed_time(
       self,
-  ) -> Tuple[microscope_utils.AtomicGrid, dt.timedelta]:
+  ) -> Tuple[microscope_utils.AtomicGridMicroscopeFrame, dt.timedelta]:
     """Gets the atomic grid of all atoms in the field of view."""
     # Note: Currently we do not expect atoms/defects to diffuse through
     # the graphene sheet during an image capture. However, if this changes,
