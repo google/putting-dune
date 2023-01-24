@@ -49,6 +49,19 @@ def sample_image_parameters(rng: np.random.Generator):
   )
 
 
+def sample_noisy_image_parameters(rng: np.random.Generator):
+  """Very noisy images hand-tuned by joshgreaves@ & jfarebro@."""
+  return ImageGenerationParameters(
+      intensity_exponent=rng.uniform(1.4, 2.0),
+      gaussian_variance=rng.uniform(0.05, 0.85),
+      jitter_rate=rng.uniform(0.0, 5.0),
+      poisson_rate_multiplier=rng.exponential(4) + 1.0,
+      salt_and_pepper_amount=rng.uniform(0.0, 1e-2),
+      blur_amount=rng.uniform(0.0, 0.25),
+      contrast_gamma=rng.uniform(0.2, 1.0),
+  )
+
+
 def generate_grid_mask(
     grid: microscope_utils.AtomicGrid,
     fov: microscope_utils.MicroscopeFieldOfView,
