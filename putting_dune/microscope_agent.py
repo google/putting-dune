@@ -19,6 +19,7 @@ from typing import List
 
 import dm_env
 import numpy as np
+from putting_dune import constants
 from putting_dune import microscope_utils
 from putting_dune.experiments import experiments
 
@@ -58,8 +59,8 @@ class MicroscopeAgent:
     features = self.feature_constructor.get_features(observation, self.goal)
     goal_return = self.goal.calculate_reward_and_terminal(observation)
 
-    # TODO(joshgreaves): What discount to use?
-    discount = 0.99
+    elapsed_seconds = observation.elapsed_time.total_seconds()
+    discount = constants.GAMMA_PER_SECOND**elapsed_seconds
 
     if self._is_first_step:
       # We have restart override terminal or truncation.

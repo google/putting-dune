@@ -93,10 +93,15 @@ class PuttingDuneEnvironment(dm_env.Environment):
     self._feature_constructor.reset()
     self.goal.reset(self._rng, self.last_microscope_observation)
 
+    elapsed_seconds = (
+        self.last_microscope_observation.elapsed_time.total_seconds()
+    )
+    discount = constants.GAMMA_PER_SECOND**elapsed_seconds
+
     return dm_env.TimeStep(
         step_type=dm_env.StepType.FIRST,
         reward=0.0,
-        discount=0.99,
+        discount=discount,
         observation=self._feature_constructor.get_features(
             self.last_microscope_observation, self.goal
         ),
