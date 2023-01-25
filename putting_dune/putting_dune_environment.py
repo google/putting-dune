@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pyformat: mode=pyink
 """Putting Dune Environment for use with RL agents."""
 
 import datetime as dt

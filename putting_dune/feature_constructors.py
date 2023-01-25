@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pyformat: mode=pyink
 """Classes for constructing features from simulator state."""
 
 import abc

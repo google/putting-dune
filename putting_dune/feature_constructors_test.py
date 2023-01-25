@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pyformat: mode=pyink
 """Tests for feature_constructors."""
 
 from absl.testing import absltest

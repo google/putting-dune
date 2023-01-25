@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pyformat: mode=pyink
 """An agent for interfacing directly with a microscope."""
 
 from typing import List

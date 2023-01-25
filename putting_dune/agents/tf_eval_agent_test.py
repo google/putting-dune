@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pyformat: mode=pyink
 """Tests for tf_eval_agent."""
 
 from absl.testing import absltest

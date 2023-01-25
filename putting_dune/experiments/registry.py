@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pyformat: mode=pyink
 """A collection of experiments."""
 
 import dataclasses
@@ -172,35 +171,37 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
     ),
 })
 
-_TRAIN_EXPERIMENTS = frozendict.frozendict({
-    'relative_simple_rates': experiments.TrainExperiment(
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
-        get_simulator_config=_get_simple_rates_config,
-    ),
-    'relative_prior_rates': experiments.TrainExperiment(
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
-        get_simulator_config=_get_human_prior_rates_config,
-    ),
-    'relative_simple_rates_from_images': experiments.TrainExperiment(
-        get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
-        get_simulator_config=_get_simple_rates_config,
-    ),
-    'relative_simple_rates_from_images_variable_time': (
-        experiments.TrainExperiment(
-            get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(
-                dwell_time_range=(
-                    dt.timedelta(seconds=1.0),
-                    dt.timedelta(seconds=10.0),
-                )
-            ),
+_TRAIN_EXPERIMENTS = frozendict.frozendict(
+    {
+        'relative_simple_rates': experiments.TrainExperiment(
+            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
             get_simulator_config=_get_simple_rates_config,
-        )
-    ),
-    'direct_simple_rates_from_images': experiments.TrainExperiment(
-        get_adapters_and_goal=_get_direct_goal_reaching_from_pixels,
-        get_simulator_config=_get_simple_rates_config,
-    ),
-})
+        ),
+        'relative_prior_rates': experiments.TrainExperiment(
+            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+            get_simulator_config=_get_human_prior_rates_config,
+        ),
+        'relative_simple_rates_from_images': experiments.TrainExperiment(
+            get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
+            get_simulator_config=_get_simple_rates_config,
+        ),
+        'relative_simple_rates_from_images_variable_time': (
+            experiments.TrainExperiment(
+                get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(
+                    dwell_time_range=(
+                        dt.timedelta(seconds=1.0),
+                        dt.timedelta(seconds=10.0),
+                    )
+                ),
+                get_simulator_config=_get_simple_rates_config,
+            )
+        ),
+        'direct_simple_rates_from_images': experiments.TrainExperiment(
+            get_adapters_and_goal=_get_direct_goal_reaching_from_pixels,
+            get_simulator_config=_get_simple_rates_config,
+        ),
+    }
+)
 
 _EVAL_EXPERIMENTS = frozendict.frozendict(
     {
