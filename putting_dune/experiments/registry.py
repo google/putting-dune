@@ -230,7 +230,7 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
 
 def create_microscope_experiment(name: str) -> experiments.MicroscopeExperiment:
   if name not in _MICROSCOPE_EXPERIMENTS:
-    raise ValueError(f'Unknown micorscope experiment {name}.')
+    raise ValueError(f'Unknown microscope experiment {name}.')
   return _MICROSCOPE_EXPERIMENTS[name]
 
 
