@@ -84,7 +84,7 @@ def evaluate(
   """Evaluates an agent on the specified environment and evaluation suite.
 
   Args:
-    agent: The agent to evluate.
+    agent: The agent to evaluate.
     env: The PuttingDuneEnvironment to evaluate on.
     eval_suite: The evaluation suite to run.
     timeout: A timeout to impose on evaluation. This timeout includes both the

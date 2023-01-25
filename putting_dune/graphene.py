@@ -359,6 +359,7 @@ class PristineSingleDopedGraphene(Material):
           silicon_position,
           si_neighbors_index,
       )
+      transition_rates = np.asarray(transition_rates).astype(np.float32)
       total_rate = np.sum(transition_rates)
 
       # The time at which the next transition takes place is modeled
