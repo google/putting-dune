@@ -14,11 +14,14 @@
 
 """An agent for interfacing directly with a microscope."""
 
+import datetime as dt
 from typing import List
 
 import dm_env
 import numpy as np
 from putting_dune import constants
+from putting_dune import geometry
+from putting_dune import graphene
 from putting_dune import microscope_utils
 from putting_dune.experiments import experiments
 
@@ -53,10 +56,23 @@ class MicroscopeAgent:
   def step(
       self,
       observation: microscope_utils.MicroscopeObservation,
-  ) -> List[microscope_utils.BeamControl]:
+  ) -> List[microscope_utils.BeamControlMicroscopeFrame]:
     """Steps the agent."""
-    features = self.feature_constructor.get_features(observation, self.goal)
-    goal_return = self.goal.calculate_reward_and_terminal(observation)
+    try:
+      features = self.feature_constructor.get_features(observation, self.goal)
+      goal_return = self.goal.calculate_reward_and_terminal(observation)
+    except graphene.SiliconNotFoundError:
+      # TODO(joshgreaves): This is desirable for now, but we will need to
+      # rethink it in the future.
+      # If we couldn't find a silicon, rescan.
+      return [
+          microscope_utils.BeamControlMicroscopeFrame(
+              microscope_utils.BeamControl(
+                  position=geometry.Point((0.0, 0.0)),
+                  dwell_time=dt.timedelta(seconds=0),
+              )
+          )
+      ]
 
     elapsed_seconds = observation.elapsed_time.total_seconds()
     discount = constants.GAMMA_PER_SECOND**elapsed_seconds

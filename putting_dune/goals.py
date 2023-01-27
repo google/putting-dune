@@ -77,16 +77,14 @@ class SingleSiliconGoalReaching(Goal):
       initial_observation: The initial simulator observation.
 
     Raises:
-      RuntimeError: If the number of observed silicons is not 1.
+      RuntimeError: if not valid goal positions could be found.
+      SiliconNotFoundError: if no silicon atom was found.
     """
     # TODO(joshgreaves): Enable ability to sample goals outside FOV.
-    silicon_position = graphene.get_silicon_positions(initial_observation.grid)
-    num_silicon_atoms, _ = silicon_position.shape
-    if num_silicon_atoms != 1:
-      raise RuntimeError(
-          f'{self.__class__} expected to find a single silicon atom. Instead,'
-          f' {num_silicon_atoms} were found.'
-      )
+    silicon_position = graphene.get_single_silicon_position(
+        initial_observation.grid
+    )
+    silicon_position = silicon_position.reshape(1, 2)
 
     # Get the distance of every atom from the silicon atom.
     # Center atoms on silicon atom, and then account for the FOV
@@ -132,24 +130,20 @@ class SingleSiliconGoalReaching(Goal):
     Args:
       observation: The last observation from the simulator.
 
-    Raises:
-      RuntimeError: If the number of observed silicons is not 1.
-
     Returns:
       The reward, and whether the episode is terminal or should be
         truncated. Truncation happens when atoms get to the edge of
         the material and we can no longer simulate.
+
+    Raises:
+      SiliconNotFoundError: if no silicon atom was found.
     """
     # Calculate the reward.
-    material_frame_grid = observation.fov.microscope_frame_to_material_frame(
-        observation.grid
+    silicon_position = graphene.get_single_silicon_position(observation.grid)
+    silicon_position_material_frame = (
+        observation.fov.microscope_frame_to_material_frame(silicon_position)
     )
-    silicon_positions = graphene.get_silicon_positions(material_frame_grid)
-
-    num_silicon, _ = silicon_positions.shape
-    if num_silicon != 1:
-      raise RuntimeError(f'Found {num_silicon} silicon when 1 was expected.')
-    silicon_position_material_frame = silicon_positions.reshape(2)
+    silicon_position_material_frame = silicon_position_material_frame.reshape(2)
 
     # If we want a dense reward, we can use this cost.
     # cost = np.linalg.norm(

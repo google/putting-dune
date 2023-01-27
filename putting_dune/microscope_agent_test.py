@@ -14,10 +14,12 @@
 
 """Tests for microscope_agent."""
 
+import datetime as dt
 from unittest import mock
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import constants
 from putting_dune import microscope_agent
 from putting_dune import microscope_utils
 from putting_dune import test_utils
@@ -82,6 +84,21 @@ class MicroscopeAgentTest(absltest.TestCase):
     self.assertIsInstance(controls, list)
     self.assertLen(controls, 1)
     self.assertIsInstance(controls[0], microscope_utils.BeamControl)
+
+  def test_microscope_agent_rescans_if_no_silicon_found(self):
+    rng = np.random.default_rng(0)
+    experiment = registry.create_microscope_experiment('relative_random')
+    observation = test_utils.create_single_silicon_observation(rng)
+
+    agent = microscope_agent.MicroscopeAgent(rng, experiment)
+    agent.reset(rng, observation)
+
+    observation.grid.atomic_numbers[:] = constants.CARBON
+    controls = agent.step(observation)
+
+    self.assertIsInstance(controls, list)
+    self.assertLen(controls, 1)
+    self.assertEqual(controls[0].dwell_time, dt.timedelta(seconds=0))
 
 
 if __name__ == '__main__':

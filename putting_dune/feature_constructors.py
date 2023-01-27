@@ -90,7 +90,18 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
       observation: microscope_utils.MicroscopeObservation,
       goal: goals.Goal,
   ) -> np.ndarray:
-    """Gets features for an agent based on the osbervation and goal."""
+    """Gets features for an agent based on the osbervation and goal.
+
+    Args:
+      observation: The observation from the microscope.
+      goal: The current goal we are executing.
+
+    Returns:
+      A numpy feature vector.
+
+    Raises:
+      SiliconNotFoundError: if no silicon atom was found.
+    """
     if not isinstance(goal, goals.SingleSiliconGoalReaching):
       raise ValueError(
           f'{self.__class__} only usable with goals.SingleSiliconGoalReaching.'
@@ -98,9 +109,10 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
       )
     goal = typing.cast(goals.SingleSiliconGoalReaching, goal)
 
-    silicon_position = graphene.get_silicon_positions(observation.grid).reshape(
-        2
-    )
+    silicon_position = graphene.get_single_silicon_position(observation.grid)
+
+    # Ensure the silicon position shape is correct.
+    silicon_position = silicon_position.reshape(2)
 
     # Get the vectors to the nearest neighbors.
     nearest_neighbors = neighbors.NearestNeighbors(

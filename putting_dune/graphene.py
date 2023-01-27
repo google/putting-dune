@@ -18,12 +18,17 @@ import abc
 import datetime as dt
 from typing import Callable, Iterable
 
+from absl import logging
 from jax.scipy import stats
 import numpy as np
 from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import microscope_utils
 from sklearn import neighbors
+
+
+class SiliconNotFoundError(RuntimeError):
+  ...
 
 
 def single_silicon_prior_rates(
@@ -417,3 +422,39 @@ class PristineSingleDopedGraphene(Material):
 
 def get_silicon_positions(grid: microscope_utils.AtomicGrid) -> np.ndarray:
   return grid.atom_positions[grid.atomic_numbers == constants.SILICON]
+
+
+def get_single_silicon_position(
+    grid: microscope_utils.AtomicGridMicroscopeFrame,
+) -> np.ndarray:
+  """Gets the silicon position, assuming there is only one.
+
+  If there are no silicon atoms, it raises a SiliconNotFoundError.
+  If there is 1 silicon atom, it returns its position.
+  If there are more than 1 silicon atoms, it returns the position of the
+  silicon atom nearest the center of the FOV.
+
+  Args:
+    grid: The grid to find the silicon atom on.
+
+  Returns:
+    A numpy array of the silicon atoms position.
+
+  Raises:
+    SiliconNotFoundError: If there are no silicon atoms found.
+  """
+  silicon_position = get_silicon_positions(grid)
+
+  num_silicon_atoms = silicon_position.size // 2
+  if num_silicon_atoms == 0:
+    raise SiliconNotFoundError()
+  elif num_silicon_atoms > 1:
+    logging.warning('Expected 1 silicon atom. Found %d', num_silicon_atoms)
+
+    # Select the silicon nearest the middle of the FOV.
+    distance_from_center_fov = np.linalg.norm(
+        np.asarray([[0.5, 0.5]]) - silicon_position, axis=1
+    )
+    silicon_position = silicon_position[np.argmin(distance_from_center_fov)]
+
+  return silicon_position.reshape(-1)

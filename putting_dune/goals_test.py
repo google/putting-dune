@@ -138,6 +138,22 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
 
     self.assertLen(observed_goal_positions, 3)
 
+  def test_goal_reset_raises_error_if_no_silicon_is_found(self):
+    obs = self.sim.reset(self.rng)
+    obs.grid.atomic_numbers[:] = constants.CARBON
+
+    with self.assertRaises(graphene.SiliconNotFoundError):
+      self.goal.reset(self.rng, obs)
+
+  def test_goal_calculate_raises_error_if_no_silicon_is_found(self):
+    obs = self.sim.reset(self.rng)
+    self.goal.reset(self.rng, obs)
+
+    obs.grid.atomic_numbers[:] = constants.CARBON
+
+    with self.assertRaises(graphene.SiliconNotFoundError):
+      self.goal.calculate_reward_and_terminal(obs)
+
 
 if __name__ == '__main__':
   absltest.main()

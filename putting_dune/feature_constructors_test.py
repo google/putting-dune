@@ -16,8 +16,10 @@
 
 from absl.testing import absltest
 import numpy as np
+from putting_dune import constants
 from putting_dune import feature_constructors
 from putting_dune import goals
+from putting_dune import graphene
 from putting_dune import test_utils
 
 
@@ -35,6 +37,19 @@ class FeatureConstructorsTest(absltest.TestCase):
 
     self.assertIsInstance(features, np.ndarray)
     self.assertEqual(features.shape, fc.observation_spec().shape)
+
+  def test_pristine_graphene_constructor_raises_error_with_no_silicon(self):
+    rng = np.random.default_rng(0)
+    observation = test_utils.create_single_silicon_observation(rng)
+    goal = goals.SingleSiliconGoalReaching()
+    goal.reset(rng, observation)
+    fc = feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor()
+
+    # Make all atoms carbon to trigger the exception.
+    observation.grid.atomic_numbers[:] = constants.CARBON
+
+    with self.assertRaises(graphene.SiliconNotFoundError):
+      fc.get_features(observation, goal)
 
   def test_image_feature_constructor_returns_valid_features(self):
     rng = np.random.default_rng(0)
