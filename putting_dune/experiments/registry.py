@@ -273,11 +273,6 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
             get_adapters_and_goal=_SingleSiliconGoalReaching(),
             get_simulator_config=_get_human_prior_rates_config,
         ),
-        'relative_random_learned_rates': experiments.EvalExperiment(
-            get_agent=_get_relative_random_agent,
-            get_adapters_and_goal=_SingleSiliconGoalReaching(),
-            get_simulator_config=_get_learned_rates_config,
-        ),
         'ppo_simple_images_tf': experiments.EvalExperiment(
             get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
             get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
