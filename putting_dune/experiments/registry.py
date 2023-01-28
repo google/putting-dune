@@ -100,18 +100,49 @@ _GET_PPO_SIMPLE_IMAGES_TF = _TfAgentCreator(
     ),
 )
 
+_GET_PPO_LEARNED_TF_2S = _TfAgentCreator(
+    model_name='230127_from_state_2s',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        '230127_from_state_2s.zip'
+    ),
+)
+_GET_PPO_LEARNED_TF_3S = _TfAgentCreator(
+    model_name='230127_from_state_3s',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        '230127_from_state_3s.zip'
+    ),
+)
+_GET_PPO_LEARNED_TF_4S = _TfAgentCreator(
+    model_name='230127_from_state_4s',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        '230127_from_state_4s.zip'
+    ),
+)
+
 
 
 
 # -------------------- AdaptersAndGoal --------------------
 
 
-def _get_single_silicon_goal_reaching_adapters() -> experiments.AdaptersAndGoal:
-  return experiments.AdaptersAndGoal(
-      action_adapter=action_adapters.RelativeToSiliconActionAdapter(),
-      feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
-      goal=goals.SingleSiliconGoalReaching(),
+@dataclasses.dataclass(frozen=True)
+class _SingleSiliconGoalReaching:
+  dwell_time_range: Tuple[dt.timedelta, dt.timedelta] = (
+      dt.timedelta(seconds=1.5),
+      dt.timedelta(seconds=1.5),
   )
+
+  def __call__(self) -> experiments.AdaptersAndGoal:
+    return experiments.AdaptersAndGoal(
+        action_adapter=action_adapters.RelativeToSiliconActionAdapter(
+            dwell_time_range=self.dwell_time_range
+        ),
+        feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
+        goal=goals.SingleSiliconGoalReaching(),
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -163,22 +194,49 @@ def _get_human_prior_rates_config() -> experiments.SimulatorConfig:
 _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
     'relative_random': experiments.MicroscopeExperiment(
         get_agent=_get_relative_random_agent,
-        get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(),
     ),
     'ppo_simple_images_tf': experiments.MicroscopeExperiment(
         get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
         get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
+    ),
+    'ppo_learned_tf_2s': experiments.MicroscopeExperiment(
+        get_agent=_GET_PPO_LEARNED_TF_2S,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.0),
+                dt.timedelta(seconds=10.0),
+            )
+        ),
+    ),
+    'ppo_learned_tf_3s': experiments.MicroscopeExperiment(
+        get_agent=_GET_PPO_LEARNED_TF_3S,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.0),
+                dt.timedelta(seconds=10.0),
+            )
+        ),
+    ),
+    'ppo_learned_tf_4s': experiments.MicroscopeExperiment(
+        get_agent=_GET_PPO_LEARNED_TF_4S,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.0),
+                dt.timedelta(seconds=10.0),
+            )
+        ),
     ),
 })
 
 _TRAIN_EXPERIMENTS = frozendict.frozendict(
     {
         'relative_simple_rates': experiments.TrainExperiment(
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+            get_adapters_and_goal=_SingleSiliconGoalReaching(),
             get_simulator_config=_get_simple_rates_config,
         ),
         'relative_prior_rates': experiments.TrainExperiment(
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+            get_adapters_and_goal=_SingleSiliconGoalReaching(),
             get_simulator_config=_get_human_prior_rates_config,
         ),
         'relative_simple_rates_from_images': experiments.TrainExperiment(
@@ -207,17 +265,17 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
     {
         'relative_random_simple': experiments.EvalExperiment(
             get_agent=_get_relative_random_agent,
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+            get_adapters_and_goal=_SingleSiliconGoalReaching(),
             get_simulator_config=_get_simple_rates_config,
         ),
         'relative_random_prior_rates': experiments.EvalExperiment(
             get_agent=_get_relative_random_agent,
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+            get_adapters_and_goal=_SingleSiliconGoalReaching(),
             get_simulator_config=_get_human_prior_rates_config,
         ),
         'relative_random_learned_rates': experiments.EvalExperiment(
             get_agent=_get_relative_random_agent,
-            get_adapters_and_goal=_get_single_silicon_goal_reaching_adapters,
+            get_adapters_and_goal=_SingleSiliconGoalReaching(),
             get_simulator_config=_get_learned_rates_config,
         ),
         'ppo_simple_images_tf': experiments.EvalExperiment(
