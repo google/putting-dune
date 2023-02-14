@@ -175,8 +175,10 @@ class AtomDetector:
 
     return microscope_utils.AtomicGridMicroscopeFrame(
         microscope_utils.AtomicGrid(
-            atom_positions=np.vstack([carbon_centroids, silicon_centroids]),
-            atomic_numbers=np.vstack(
+            atom_positions=np.concatenate(
+                [carbon_centroids, silicon_centroids]
+            ),
+            atomic_numbers=np.concatenate(
                 [carbon_atomic_numbers, silicon_atomic_numbers]
             ),
         )

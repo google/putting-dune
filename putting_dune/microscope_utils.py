@@ -197,6 +197,36 @@ class MicroscopeFieldOfView:
     ur = self.upper_right
     return f'FOV [({ll.x:.2f}, {ll.y:.2f}), ({ur.x:.2f}, {ur.y:.2f})]'
 
+  def get_atoms_in_bounds(
+      self,
+      grid: AtomicGridMaterialFrame,
+  ) -> AtomicGridMaterialFrame:
+    """Selects the atoms within an AtomicGrid that lie within the FOV.
+
+    Args:
+      grid: An AtomicGridMaterialFrame, to be subsetted.
+
+    Returns:
+      The observed atomic grid within the supplied bounds. Atom positions are
+      left in the material frame, and can be converted by applying
+      the material_frame_to_microscope_frame method.
+    """
+    atom_positions = grid.atom_positions
+    atomic_numbers = grid.atomic_numbers
+    lower_left = np.asarray(self.lower_left.coords)
+    upper_right = np.asarray(self.upper_right.coords)
+    indices_in_bounds = np.all(
+        ((lower_left <= atom_positions) & (atom_positions <= upper_right)),
+        axis=1,
+    )
+
+    selected_atom_positions = atom_positions[indices_in_bounds]
+    selected_atomic_numbers = atomic_numbers[indices_in_bounds]
+
+    return AtomicGridMaterialFrame(
+        AtomicGrid(selected_atom_positions, selected_atomic_numbers)
+    )
+
 
 
 class SimulatorObserver:
@@ -272,4 +302,65 @@ class Trajectory:
   """
 
   observations: Sequence[MicroscopeObservation]
+
+
+
+@dataclasses.dataclass(frozen=True)
+class Drift:
+  """A trajectory of observations from a microscope.
+
+  Attributes:
+    drift: A shared (2,) drift vector applying to an entire material.
+    jitter: A (num_atoms, 2) array of per-atom displacements.
+  """
+
+  jitter: np.ndarray
+  drift: np.ndarray
+
+  def cumulate_drift(self, drift: 'Drift') -> 'Drift':
+    """Calculates a cumulative drift object from a previous drift."""
+
+    new_drift_vector = self.drift + drift.drift
+    return Drift(drift=new_drift_vector, jitter=self.jitter)
+
+  def apply_to_observation(
+      self, observation: MicroscopeObservation
+  ) -> MicroscopeObservation:
+    """Applies the drift to an observation, including jitter.
+
+    Args:
+      observation: The observation to be aligned.
+
+    Returns:
+      The observation with its grid shifted by `drift` and `jitter`, and fov
+      and controls shifted by `drift`.
+    """
+    dejittered_atom_positions = observation.grid.atom_positions - self.jitter
+    shifted_grid = AtomicGrid(
+        dejittered_atom_positions, observation.grid.atomic_numbers
+    )
+    point_drift = geometry.Point(self.drift[0], self.drift[1])
+    shifted_fov = observation.fov.shift(point_drift)
+    shifted_observation = MicroscopeObservation(
+        grid=AtomicGridMicroscopeFrame(shifted_grid),
+        fov=shifted_fov,
+        controls=observation.controls,
+        elapsed_time=observation.elapsed_time,
+        image=observation.image,
+    )
+    return shifted_observation
+
+
+
+@dataclasses.dataclass(frozen=True)
+class LabeledAlignmentTrajectory:
+  """A trajectory of observations from a microscope, with accompanying drifts.
+
+  Attributes:
+    trajectory: a Trajectory object.
+    drifts: a sequence of Drift objects.
+  """
+
+  trajectory: Trajectory
+  drifts: Sequence[Drift]
 
