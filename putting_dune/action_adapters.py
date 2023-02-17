@@ -138,11 +138,13 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
           dt.timedelta(seconds=1.5),
           dt.timedelta(seconds=1.5),
       ),
+      max_distance_angstroms: float = constants.CARBON_BOND_DISTANCE_ANGSTROMS,
   ):
     min_dwell_time, max_dwell_time = dwell_time_range
     self._fixed_dwell_time = min_dwell_time == max_dwell_time
     self._min_dwell_seconds = min_dwell_time.total_seconds()
     self._max_dwell_seconds = max_dwell_time.total_seconds()
+    self._max_distance_angstroms = max_distance_angstroms
 
   def reset(self):
     pass
@@ -168,10 +170,10 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
     # Action is [dx, dy] in unit cell terms.
     # For generality, assume aspect ratio is not square.
     fov = previous_observation.fov
-    cell_radius_x = constants.CARBON_BOND_DISTANCE_ANGSTROMS / (
+    cell_radius_x = self._max_distance_angstroms / (
         fov.upper_right.x - fov.lower_left.x
     )
-    cell_radius_y = constants.CARBON_BOND_DISTANCE_ANGSTROMS / (
+    cell_radius_y = self._max_distance_angstroms / (
         fov.upper_right.y - fov.lower_left.y
     )
     cell_radius = np.asarray([cell_radius_x, cell_radius_y])

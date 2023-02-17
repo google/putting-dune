@@ -25,6 +25,7 @@ from etils import epath
 import frozendict
 import numpy as np
 from putting_dune import action_adapters
+from putting_dune import constants
 from putting_dune import feature_constructors
 from putting_dune import goals
 from putting_dune import graphene
@@ -134,11 +135,13 @@ class _SingleSiliconGoalReaching:
       dt.timedelta(seconds=1.5),
       dt.timedelta(seconds=1.5),
   )
+  max_distance_angstroms: float = constants.CARBON_BOND_DISTANCE_ANGSTROMS
 
   def __call__(self) -> experiments.AdaptersAndGoal:
     return experiments.AdaptersAndGoal(
         action_adapter=action_adapters.RelativeToSiliconActionAdapter(
-            dwell_time_range=self.dwell_time_range
+            dwell_time_range=self.dwell_time_range,
+            max_distance_angstroms=self.max_distance_angstroms,
         ),
         feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
         goal=goals.SingleSiliconGoalReaching(),
@@ -195,6 +198,12 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
     'relative_random': experiments.MicroscopeExperiment(
         get_agent=_get_relative_random_agent,
         get_adapters_and_goal=_SingleSiliconGoalReaching(),
+    ),
+    'relative_random_long': experiments.MicroscopeExperiment(
+        get_agent=_get_relative_random_agent,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS
+        ),
     ),
     'ppo_simple_images_tf': experiments.MicroscopeExperiment(
         get_agent=_GET_PPO_SIMPLE_IMAGES_TF,

@@ -18,6 +18,8 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 from putting_dune import action_adapters
+from putting_dune import constants
+from putting_dune import graphene
 from putting_dune import microscope_utils
 from putting_dune import test_utils
 
@@ -194,6 +196,52 @@ class ActionAdaptersTest(parameterized.TestCase):
 
     self.assertLen(simulator_controls, 1)
     self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
+
+  # TODO(joshgreaves): Write tests for relative adapter dwell time range.
+
+  def test_relative_adapter_max_distance_changes_allowed_beam_placement(self):
+    unit_adapter = action_adapters.RelativeToSiliconActionAdapter()
+    long_adapter = action_adapters.RelativeToSiliconActionAdapter(
+        max_distance_angstroms=3.0
+    )
+    unit_adapter.reset()
+    long_adapter.reset()
+
+    # Action points directly to the right.
+    action = np.asarray([1.0, 0.0], dtype=np.float32)
+    observation = test_utils.create_single_silicon_observation(self.rng)
+
+    unit_control = unit_adapter.get_action(observation, action)
+    long_control = long_adapter.get_action(observation, action)
+
+    si_pos = graphene.get_single_silicon_position(observation.grid)
+    si_pos_material_frame = observation.fov.microscope_frame_to_material_frame(
+        si_pos
+    )
+    unit_control_pos_material_frame = (
+        observation.fov.microscope_frame_to_material_frame(
+            unit_control[0].position
+        )
+    )
+    long_control_pos_material_frame = (
+        observation.fov.microscope_frame_to_material_frame(
+            long_control[0].position
+        )
+    )
+
+    unit_control_distance = np.linalg.norm(
+        np.asarray(unit_control_pos_material_frame.coords)
+        - si_pos_material_frame
+    )
+    long_control_distance = np.linalg.norm(
+        np.asarray(long_control_pos_material_frame.coords)
+        - si_pos_material_frame
+    )
+
+    self.assertAlmostEqual(
+        unit_control_distance, constants.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
+    self.assertAlmostEqual(long_control_distance, 3.0)
 
 
 if __name__ == '__main__':
