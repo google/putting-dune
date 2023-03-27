@@ -138,6 +138,7 @@ class SimulatorTest(parameterized.TestCase):
   )
   def test_simulator_progresses_time_correctly(self, unused_rates_mock):
     time_per_control = [dt.timedelta(seconds=x) for x in (1.5, 3.0, 7.23)]
+    image_duration = dt.timedelta(seconds=3.5)
     controls = []
     for x in time_per_control:
       controls.append(
@@ -145,14 +146,16 @@ class SimulatorTest(parameterized.TestCase):
               microscope_utils.BeamControl(geometry.Point(0.5, 0.7), x)
           )
       )
-    sim = simulator.PuttingDuneSimulator(self._material)
+    sim = simulator.PuttingDuneSimulator(
+        self._material, image_duration=image_duration
+    )
     sim.reset(self._rng)
 
     simulator_observation = sim.step_and_image(self._rng, controls)
 
     # Time of controls + 1 image taken after all controls are applied.
     predicted_elapsed_time = sum(time_per_control, start=dt.timedelta())
-    predicted_elapsed_time += sim._image_duration
+    predicted_elapsed_time += image_duration
 
     self.assertEqual(simulator_observation.elapsed_time, predicted_elapsed_time)
 

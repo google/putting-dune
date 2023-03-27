@@ -180,7 +180,8 @@ def _get_simple_rates_config() -> experiments.SimulatorConfig:
   return experiments.SimulatorConfig(
       material=graphene.PristineSingleDopedGraphene(
           predict_rates=graphene.simple_transition_rates
-      )
+      ),
+      image_duration=dt.timedelta(seconds=2.0),
   )
 
 
@@ -188,7 +189,8 @@ def _get_human_prior_rates_config() -> experiments.SimulatorConfig:
   return experiments.SimulatorConfig(
       material=graphene.PristineSingleDopedGraphene(
           predict_rates=graphene.HumanPriorRatePredictor().predict
-      )
+      ),
+      image_duration=dt.timedelta(seconds=2.0),
   )
 
 

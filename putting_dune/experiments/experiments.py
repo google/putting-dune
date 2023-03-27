@@ -15,6 +15,7 @@
 """Useful structures for experiment definitions."""
 
 import dataclasses
+import datetime as dt
 from typing import Callable
 
 import numpy as np
@@ -35,6 +36,7 @@ class AdaptersAndGoal:
 @dataclasses.dataclass(frozen=True)
 class SimulatorConfig:
   material: graphene.Material
+  image_duration: dt.timedelta
 
 
 AgentConstructor = Callable[

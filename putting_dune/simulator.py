@@ -34,6 +34,7 @@ class PuttingDuneSimulator:
       # assumes there is one silicon atom to follow.
       material: graphene.PristineSingleDopedGraphene,
       *,
+      image_duration: dt.timedelta = dt.timedelta(seconds=2.0),
       observers: Sequence[microscope_utils.SimulatorObserver] = (),
   ):
     """PuttingDuneSimulator Constructor.
@@ -45,14 +46,15 @@ class PuttingDuneSimulator:
 
     Args:
       material: The material to simulator.
+      image_duration: The time required to image the material. This is generally
+        between 2 and 4 seconds.
       observers: A sequence of objects that observe the inner workings of the
         simulator.
     """
     self.material = material
     self._observers = list(observers)
 
-    # TODO(joshgreaves): Tune this to match the real image duration time.
-    self._image_duration = dt.timedelta(seconds=1.5)
+    self._image_duration = image_duration
 
     # Will be instantiated on reset.
     self._has_been_reset = False
@@ -150,15 +152,7 @@ class PuttingDuneSimulator:
     elapsed_time += image_time
 
     # Ensure there is a silicon still in view, and maybe readjust the fov.
-    observed_silicon_positions = graphene.get_silicon_positions(observed_grid)
-    assert observed_silicon_positions.shape == (1, 2)
-    observed_silicon_position = observed_silicon_positions.reshape(-1)
-
-    silicon_position_near_edge = (
-        (observed_silicon_position < 0.25) | (observed_silicon_position > 0.75)
-    ).any()
-
-    if silicon_position_near_edge:
+    if self._silicon_outside_of_safe_area(observed_grid):
       # We cheat here a little - the real implementation would need to
       # work out the exact delta to position the atom in the middle of the
       # frame, but we can just get the coordinate of the atom directly
@@ -229,3 +223,25 @@ class PuttingDuneSimulator:
       raise RuntimeError(
           f'Must call reset on {self.__class__} before {fn_name}.'
       )
+
+  def _silicon_outside_of_safe_area(
+      self, observed_grid: microscope_utils.AtomicGridMicroscopeFrame
+  ) -> bool:
+    """Returns whether the field of view needs to be moved."""
+    observed_silicon_positions = graphene.get_silicon_positions(observed_grid)
+
+    # There is a chance the silicon has been pushed out of the FOV.
+    if not observed_silicon_positions.size:
+      return True
+
+    # Otherwise, we should still only be seeing 1 silicon atom.
+    assert observed_silicon_positions.shape == (1, 2)
+    observed_silicon_position = observed_silicon_positions.reshape(-1)
+
+    silicon_position_near_edge = (
+        (observed_silicon_position < 0.25) | (observed_silicon_position > 0.75)
+    ).any()
+
+    if silicon_position_near_edge:
+      return True
+    return False

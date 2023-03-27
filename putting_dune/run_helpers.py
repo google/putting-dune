@@ -41,6 +41,7 @@ def create_putting_dune_env(
       action_adapter=adapters_and_goal.action_adapter,
       feature_constructor=adapters_and_goal.feature_constructor,
       goal=adapters_and_goal.goal,
+      image_duration=simulator_config.image_duration,
   )
   env = StepLimitWrapper(env, step_limit=step_limit)
 

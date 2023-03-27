@@ -42,12 +42,16 @@ class PuttingDuneEnvironment(dm_env.Environment):
       action_adapter: action_adapters.ActionAdapter,
       feature_constructor: feature_constructors.FeatureConstructor,
       goal: goals.Goal,
+      *,
+      image_duration: dt.timedelta = dt.timedelta(seconds=2.0),
   ):
     self._rng = np.random.default_rng()
 
     # Create objects that persist across episodes, but may be reset.
     self._material = material
-    self.sim = simulator.PuttingDuneSimulator(self._material)
+    self.sim = simulator.PuttingDuneSimulator(
+        self._material, image_duration=image_duration
+    )
     # TODO(joshgreaves): Make the action adapter configurable.
     self._action_adapter = action_adapter
     self._feature_constructor = feature_constructor
