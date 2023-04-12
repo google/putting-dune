@@ -34,30 +34,41 @@ class ImageGenerationParameters:
   salt_and_pepper_amount: float
   blur_amount: float
   contrast_gamma: float
+  exponential_lambda: float
+  uniform_noise_scale: float
+  image_size: int = 512
 
 
-def sample_image_parameters(rng: np.random.Generator):
+def sample_image_parameters(rng: np.random.Generator, image_size: int = 512):
   return ImageGenerationParameters(
       intensity_exponent=rng.uniform(1.4, 2.0),
       gaussian_variance=rng.uniform(0.0, 5e-3),
       jitter_rate=rng.uniform(0.0, 5.0),
-      poisson_rate_multiplier=rng.exponential(2) + 0.5,
+      poisson_rate_multiplier=rng.exponential(15) + 1.0,
       salt_and_pepper_amount=rng.uniform(0.0, 1e-3),
       blur_amount=rng.uniform(0.0, 1.0),
       contrast_gamma=rng.uniform(0.6, 1.0),
+      exponential_lambda=rng.uniform(0.0, 0.1),
+      uniform_noise_scale=rng.uniform(0.0, 0.1),
+      image_size=image_size,
   )
 
 
-def sample_noisy_image_parameters(rng: np.random.Generator):
+def sample_noisy_image_parameters(
+    rng: np.random.Generator, image_size: int = 512
+):
   """Very noisy images hand-tuned by joshgreaves@ & jfarebro@."""
   return ImageGenerationParameters(
       intensity_exponent=rng.uniform(1.4, 2.0),
-      gaussian_variance=rng.uniform(0.05, 0.85),
+      gaussian_variance=rng.uniform(0.0, 0.3),
       jitter_rate=rng.uniform(0.0, 5.0),
-      poisson_rate_multiplier=rng.exponential(4) + 1.0,
+      poisson_rate_multiplier=rng.exponential(15) + 1.0,
       salt_and_pepper_amount=rng.uniform(0.0, 1e-2),
       blur_amount=rng.uniform(0.0, 0.25),
-      contrast_gamma=rng.uniform(0.2, 1.0),
+      contrast_gamma=rng.uniform(0.1, 1.0),
+      exponential_lambda=rng.uniform(0.0, 0.15),
+      uniform_noise_scale=rng.uniform(0.0, 0.15),
+      image_size=image_size,
   )
 
 
@@ -108,19 +119,26 @@ def generate_clean_image(
     fov: microscope_utils.MicroscopeFieldOfView,
     *,
     intensity_exponent: float = 1.7,
+    image_size: int = 512,
+    buffer_size: float = 0.0,
 ) -> np.ndarray:
   """Generates a clean image for an atomic grid."""
   # TODO(joshgreaves): Explore adding randomness to this function.
   atomic_numbers = set(grid.atomic_numbers)
 
-  image = np.zeros((512, 512), dtype=np.float64)
+  buffer_width = int(buffer_size * image_size)
+  buffered_image_size = image_size + 2 * buffer_width
+  image = np.zeros((buffered_image_size, buffered_image_size), dtype=np.float64)
   for atomic_number in atomic_numbers:
     positions = grid.atom_positions[grid.atomic_numbers == atomic_number]
     intensities, _, _ = np.histogram2d(
         positions[:, 0],
         positions[:, 1],
-        bins=512,
-        range=((0, 1), (0, 1)),
+        bins=buffered_image_size,
+        range=(
+            (-buffer_size, 1 + buffer_size),
+            (-buffer_size, 1 + buffer_size),
+        ),
         density=False,
     )
 
@@ -136,13 +154,18 @@ def generate_clean_image(
   fov_width = fov.upper_right.x - fov.lower_left.x
   fov_height = fov.upper_right.y - fov.lower_left.y
 
-  # We assume we will only ever generate 512x512 pixel images.
-  # 512 pixels with 20 angstrom FOV => sigma = 10
-  # => sigma = 200 / FOV
+  # We allow images of any size to be generated, and vary sigma accordingly.
+  # For example, at 512 pixels with 20 angstrom FOV => sigma = 12
+  # => sigma = 200 / FOV ~= image_size / (2 * FOV)
   # Empirically, this looks about right.
-  sigma = (225.0 / fov_width, 225.0 / fov_height)
+  sigma = (image_size / (2 * fov_width), image_size / (2 * fov_height))
 
   image = ndimage.gaussian_filter(image, sigma, mode='constant')
+
+  image = image[
+      buffer_width : buffer_width + image_size,
+      buffer_width : buffer_width + image_size,
+  ]
 
   # Normalize
   image = image / np.max(image)
@@ -192,20 +215,46 @@ def apply_contrast(image: np.ndarray, gamma: float) -> np.ndarray:
   return exposure.adjust_gamma(image, gamma)
 
 
+def apply_exponential_noise(
+    image: np.ndarray,
+    noise_scale: float,
+    rng: np.random.Generator,
+) -> np.ndarray:
+  noise = rng.exponential(noise_scale, size=image.shape)
+  image = image + noise
+  return image / np.max(image)
+
+
+def apply_uniform_noise(
+    image, noise_scale: float, rng: np.random.Generator
+) -> np.ndarray:
+  noise = rng.uniform(0.0, noise_scale, size=image.shape)
+  image = image + noise
+  return image / np.max(image)
+
+
 def generate_stem_image(
     grid: microscope_utils.AtomicGrid,
     fov: microscope_utils.MicroscopeFieldOfView,
     image_params: ImageGenerationParameters,
     rng: np.random.Generator,
+    buffer_size: float = 0.0,
 ) -> np.ndarray:
   """Generates a noisy STEM image."""
-  image = generate_clean_image(grid, fov)
-  image = apply_gaussian_noise(image, image_params.gaussian_variance, rng)
-  image = apply_jitter(image, image_params.jitter_rate, rng)
+  image = generate_clean_image(
+      grid,
+      fov,
+      image_size=image_params.image_size,
+      intensity_exponent=image_params.intensity_exponent,
+      buffer_size=buffer_size,
+  )
   image = apply_poisson_noise(image, image_params.poisson_rate_multiplier, rng)
+  image = apply_jitter(image, image_params.jitter_rate, rng)
   image = apply_salt_and_pepper_noise(
       image, image_params.salt_and_pepper_amount, rng
   )
-  image = apply_blur(image, image_params.blur_amount)
+  image = apply_uniform_noise(image, image_params.uniform_noise_scale, rng)
+  image = apply_exponential_noise(image, image_params.exponential_lambda, rng)
   image = apply_contrast(image, image_params.contrast_gamma)
+  image = apply_gaussian_noise(image, image_params.gaussian_variance, rng)
   return image

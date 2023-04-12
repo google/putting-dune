@@ -134,6 +134,70 @@ class SimulatorUtilsTest(absltest.TestCase):
           microscope_grid.atom_positions, microscope_grid_before.atom_positions
       )
 
+  def test_fov_resizes_correctly(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((-5.0, 0.0)),
+        upper_right=geometry.Point((5.0, 20.0)),
+    )
+
+    with self.subTest('zoom_in_2'):
+      zoomed_fov = fov.zoom(2)
+      zoomed_lower_left = np.asarray(zoomed_fov.lower_left.coords)
+      zoomed_upper_right = np.asarray(zoomed_fov.upper_right.coords)
+      np.testing.assert_allclose(zoomed_lower_left, np.array([[-2.5, 5]]))
+      np.testing.assert_allclose(zoomed_upper_right, np.array([[2.5, 15]]))
+    with self.subTest('zoom_out_2'):
+      zoomed_fov = fov.zoom(0.5)
+      zoomed_lower_left = np.asarray(zoomed_fov.lower_left.coords)
+      zoomed_upper_right = np.asarray(zoomed_fov.upper_right.coords)
+      np.testing.assert_allclose(zoomed_lower_left, np.array([[-10, -10]]))
+      np.testing.assert_allclose(zoomed_upper_right, np.array([[10, 30]]))
+    with self.subTest('zoom_identity'):
+      zoomed_fov = fov.zoom(1)
+      zoomed_lower_left = np.asarray(zoomed_fov.lower_left.coords)
+      zoomed_upper_right = np.asarray(zoomed_fov.upper_right.coords)
+      np.testing.assert_allclose(zoomed_lower_left, np.array([[-5, 0]]))
+      np.testing.assert_allclose(zoomed_upper_right, np.array([[5, 20]]))
+
+  def test_fov_converts_beamcontrolframes_of_reference(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((-5.0, 0.0)),
+        upper_right=geometry.Point((5.0, 20.0)),
+    )
+
+    point = geometry.Point((0.5, 1.0))
+
+    material_point = fov.microscope_frame_to_material_frame(point)
+    microscope_point = fov.material_frame_to_microscope_frame(material_point)
+
+    microscope_frame_control = microscope_utils.BeamControl(
+        microscope_point, dwell_time=dt.timedelta(seconds=1)
+    )
+    with self.subTest('microscope_to_material'):
+      material_frame_control = fov.microscope_frame_to_material_frame(
+          microscope_frame_control
+      )
+      self.assertAlmostEqual(
+          material_frame_control.position.x, material_point.x
+      )
+      self.assertAlmostEqual(
+          material_frame_control.position.y, material_point.y
+      )
+
+    material_frame_control = microscope_utils.BeamControl(
+        material_point, dwell_time=dt.timedelta(seconds=1)
+    )
+    with self.subTest('material_to_microscope'):
+      microscope_frame_control = fov.material_frame_to_microscope_frame(
+          material_frame_control
+      )
+      self.assertAlmostEqual(
+          microscope_frame_control.position.x, microscope_point.x
+      )
+      self.assertAlmostEqual(
+          microscope_frame_control.position.y, microscope_point.y
+      )
+
   def test_fov_converts_ndarray_frames_of_reference(self):
     fov = microscope_utils.MicroscopeFieldOfView(
         lower_left=geometry.Point((-5.0, 0.0)),
@@ -171,6 +235,44 @@ class SimulatorUtilsTest(absltest.TestCase):
       self.assertIsInstance(microscope_point, geometry.Point)
       self.assertAlmostEqual(microscope_point.x, point.x)
       self.assertAlmostEqual(microscope_point.y, point.y)
+
+  def test_fov_get_atoms_in_bounds(self):
+    fov = microscope_utils.MicroscopeFieldOfView(
+        lower_left=geometry.Point((2.5, 2.5)),
+        upper_right=geometry.Point((7.5, 7.5)),
+    )
+
+    x_positions = np.linspace(0, 10, 11)
+    y_positions = np.linspace(0, 10, 11)
+    atom_positions = np.stack([x_positions, y_positions], axis=-1)
+    atomic_numbers = np.arange(0, 11, 1)
+    grid = microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+    grid = microscope_utils.AtomicGridMaterialFrame(grid)
+
+    with self.subTest('no_tolerance'):
+      target_positions = np.linspace(3, 7, 5)
+      target_positions = np.stack([target_positions, target_positions], axis=-1)
+      target_atomic_numbers = np.arange(3, 8, 1)
+      subgrid = fov.get_atoms_in_bounds(grid, tolerance=0.0)
+      np.testing.assert_allclose(subgrid.atom_positions, target_positions)
+      np.testing.assert_allclose(subgrid.atomic_numbers, target_atomic_numbers)
+    with self.subTest('tolerance_100'):
+      subgrid = fov.get_atoms_in_bounds(grid, tolerance=100.0)
+      np.testing.assert_allclose(subgrid.atom_positions, grid.atom_positions)
+      np.testing.assert_allclose(subgrid.atomic_numbers, grid.atomic_numbers)
+    with self.subTest('tolerance_negative_100'):
+      target_positions = np.zeros((0, 2))
+      target_atomic_numbers = np.zeros((0,))
+      subgrid = fov.get_atoms_in_bounds(grid, tolerance=-100.0)
+      np.testing.assert_allclose(subgrid.atom_positions, target_positions)
+      np.testing.assert_allclose(subgrid.atomic_numbers, target_atomic_numbers)
+    with self.subTest('tolerance_1'):
+      target_positions = np.linspace(2, 8, 7)
+      target_positions = np.stack([target_positions, target_positions], axis=-1)
+      target_atomic_numbers = np.arange(2, 9, 1)
+      subgrid = fov.get_atoms_in_bounds(grid, tolerance=1.0)
+      np.testing.assert_allclose(subgrid.atom_positions, target_positions)
+      np.testing.assert_allclose(subgrid.atomic_numbers, target_atomic_numbers)
 
 
   def test_trajectory_can_be_created_from_proto(self):

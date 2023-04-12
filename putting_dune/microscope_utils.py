@@ -108,8 +108,45 @@ class MicroscopeFieldOfView:
   def height(self) -> float:
     return self.upper_right.y - self.lower_left.y
 
+  def resize(
+      self, new_width: float, new_height: float
+  ) -> 'MicroscopeFieldOfView':
+    """Resizes the MicroscopeFieldOfView while keeping its center constant.
+
+    Args:
+      new_width: New width (in angstroms), positive float.
+      new_height: New height (in angstroms), positive float.
+
+    Returns:
+      A new MicroscopeFieldOfView with the same offset as this one,
+      but with different width and height.
+    """
+    assert new_width > 0 and new_height > 0
+    new_scale_vector = np.asarray([new_width, new_height]) / 2
+    centerpoint = (
+        np.asarray(self.lower_left.coords).reshape(-1)
+        + np.asarray(self.upper_right.coords).reshape(-1)
+    ) / 2
+    new_lower_left = centerpoint - new_scale_vector
+    new_upper_right = centerpoint + new_scale_vector
+    new_lower_left = geometry.Point(new_lower_left[0], new_lower_left[1])
+    new_upper_right = geometry.Point(new_upper_right[0], new_upper_right[1])
+    return MicroscopeFieldOfView(new_lower_left, new_upper_right)
+
+  def zoom(self, zoom_factor: float) -> 'MicroscopeFieldOfView':
+    assert zoom_factor > 0
+    new_width = self.width / zoom_factor
+    new_height = self.height / zoom_factor
+    return self.resize(new_width, new_height)
+
   @typing.overload
   def microscope_frame_to_material_frame(self, point: np.ndarray) -> np.ndarray:
+    ...
+
+  @typing.overload
+  def microscope_frame_to_material_frame(
+      self, point: BeamControl
+  ) -> BeamControl:
     ...
 
   @typing.overload
@@ -148,6 +185,13 @@ class MicroscopeFieldOfView:
           point.x * scale[0, 0] + lower_left[0, 0],
           point.y * scale[0, 1] + lower_left[0, 1],
       ))
+    elif isinstance(point, BeamControl):
+      position = geometry.Point((
+          point.position.x * scale[0, 0] + lower_left[0, 0],
+          point.position.y * scale[0, 1] + lower_left[0, 1],
+      ))
+      return BeamControl(position, point.dwell_time)
+
     raise NotImplementedError(f'Point of type {type(point)} is not supported.')
 
   @typing.overload
@@ -164,6 +208,12 @@ class MicroscopeFieldOfView:
   def material_frame_to_microscope_frame(
       self, point: AtomicGridMaterialFrame
   ) -> AtomicGridMicroscopeFrame:
+    ...
+
+  @typing.overload
+  def material_frame_to_microscope_frame(
+      self, point: BeamControl
+  ) -> BeamControl:
     ...
 
   def material_frame_to_microscope_frame(self, point):
@@ -190,6 +240,13 @@ class MicroscopeFieldOfView:
           (point.x - lower_left[0, 0]) / scale[0, 0],
           (point.y - lower_left[0, 1]) / scale[0, 1],
       ))
+    elif isinstance(point, BeamControl):
+      position = geometry.Point((
+          (point.position.x - lower_left[0, 0]) / scale[0, 0],
+          (point.position.y - lower_left[0, 1]) / scale[0, 1],
+      ))
+      return BeamControl(position, point.dwell_time)
+
     raise NotImplementedError(f'Point of type {type(point)} is not supported.')
 
   def __str__(self) -> str:
@@ -200,11 +257,15 @@ class MicroscopeFieldOfView:
   def get_atoms_in_bounds(
       self,
       grid: AtomicGridMaterialFrame,
+      tolerance: float = 0,
   ) -> AtomicGridMaterialFrame:
     """Selects the atoms within an AtomicGrid that lie within the FOV.
 
     Args:
       grid: An AtomicGridMaterialFrame, to be subsetted.
+      tolerance: Buffer zone width (in angstroms). Positive values include atoms
+        outside the FOV, while negative values include only atoms near the
+        center of the FOV.
 
     Returns:
       The observed atomic grid within the supplied bounds. Atom positions are
@@ -213,8 +274,8 @@ class MicroscopeFieldOfView:
     """
     atom_positions = grid.atom_positions
     atomic_numbers = grid.atomic_numbers
-    lower_left = np.asarray(self.lower_left.coords)
-    upper_right = np.asarray(self.upper_right.coords)
+    lower_left = np.asarray(self.lower_left.coords) - tolerance
+    upper_right = np.asarray(self.upper_right.coords) + tolerance
     indices_in_bounds = np.all(
         ((lower_left <= atom_positions) & (atom_positions <= upper_right)),
         axis=1,
