@@ -16,12 +16,14 @@
 
 import dataclasses
 import datetime as dt
-import os
+import shutil
+import tempfile
 import time
 from typing import List, Optional, Sequence, Tuple
 
 from absl import logging
 import dm_env
+from etils import epath
 import frozendict
 from putting_dune import plotting_utils
 from putting_dune import putting_dune_environment
@@ -163,11 +165,18 @@ def evaluate(
     results.append(eval_result)
 
     if video_save_dir is not None:
-      anim = plotting_utils.generate_video_from_simulator_events(
-          observers['event_observer'].events,
-          env.goal.goal_position_material_frame,  # pylint: disable=protected-access
-      )
-      anim.save(os.path.join(video_save_dir, f'{seed}.gif'))
+      epath.Path(video_save_dir).mkdir(parents=True, exist_ok=True)
+      # NOTE: This will not work on Windows, since Windows won't allow us
+      # to open the temp file twice.
+      with tempfile.NamedTemporaryFile(suffix='.gif') as src_f:
+        anim = plotting_utils.generate_video_from_simulator_events(
+            observers['event_observer'].events,
+            env.goal.goal_position_material_frame,  # pylint: disable=protected-access
+        )
+        anim.save(src_f.name)
+
+        with (epath.Path(video_save_dir) / f'{seed}.gif').open('wb') as dest_f:
+          shutil.copyfileobj(src_f, dest_f)
 
   for observer in observers.values():
     env.sim.remove_observer(observer)
