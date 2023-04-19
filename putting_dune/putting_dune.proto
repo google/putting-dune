@@ -1,0 +1,63 @@
+syntax = "proto2";
+
+package putting_dune.google;
+
+import "third_party/tensorflow/core/framework/tensor.proto";
+
+message Point2D {
+  optional float x = 1;
+  optional float y = 2;
+}
+
+message Atom {
+  optional int32 atomic_number = 1;
+  // Since AtomicGrids are used for positions of atoms based on a 2D scan.
+  optional Point2D position = 2;
+}
+
+message AtomicGrid {
+  repeated Atom atoms = 1;
+}
+
+message BeamControl {
+  optional Point2D position = 1;
+  optional float dwell_time_seconds = 2;
+}
+
+message FieldOfView {
+  optional Point2D lower_left_angstroms = 1;
+  optional Point2D upper_right_angstroms = 2;
+}
+
+message MicroscopeObservation {
+  optional AtomicGrid grid = 1;
+  optional FieldOfView fov = 2;
+  repeated BeamControl controls = 3;
+  // The total elapsed time since the beginning of the episode.
+  optional float elapsed_time_seconds = 4;
+  optional tensorflow.TensorProto image = 5;
+}
+
+message Trajectory {
+  repeated MicroscopeObservation observations = 1;
+}
+
+message Transition {
+  optional AtomicGrid grid_before = 1;
+  optional AtomicGrid grid_after = 2;
+
+  optional FieldOfView fov_before = 3;
+  optional FieldOfView fov_after = 4;
+
+  repeated BeamControl controls = 5;
+}
+
+message Drift {
+  repeated Point2D jitter = 1;
+  optional Point2D drift = 2;
+}
+
+message LabeledAlignmentTrajectory {
+  optional Trajectory trajectory = 1;
+  repeated Drift drifts = 2;
+}

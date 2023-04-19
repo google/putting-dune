@@ -20,6 +20,8 @@ from absl.testing import absltest
 import numpy as np
 from putting_dune import geometry
 from putting_dune import microscope_utils
+from putting_dune import putting_dune_pb2
+import tensorflow as tf
 
 
 _ATOMIC_GRID = microscope_utils.AtomicGrid(
@@ -274,6 +276,313 @@ class SimulatorUtilsTest(absltest.TestCase):
       np.testing.assert_allclose(subgrid.atom_positions, target_positions)
       np.testing.assert_allclose(subgrid.atomic_numbers, target_atomic_numbers)
 
+  def test_atomic_grid_converts_to_proto(self):
+    grid_proto = _ATOMIC_GRID.to_proto()
+
+    self.assertLen(grid_proto.atoms, 2)
+    self.assertEqual(grid_proto.atoms[0].atomic_number, 3)
+    self.assertEqual(grid_proto.atoms[0].position.x, 0.0)
+    self.assertEqual(grid_proto.atoms[0].position.y, 0.0)
+    self.assertEqual(grid_proto.atoms[1].atomic_number, 4)
+    self.assertEqual(grid_proto.atoms[1].position.x, 1.0)
+    self.assertEqual(grid_proto.atoms[1].position.y, 2.0)
+
+  def test_atomic_grid_can_be_created_from_proto(self):
+    grid_proto = putting_dune_pb2.AtomicGrid(
+        atoms=(
+            putting_dune_pb2.Atom(
+                atomic_number=0,
+                position=putting_dune_pb2.Point2D(x=1.0, y=1.1),
+            ),
+            putting_dune_pb2.Atom(
+                atomic_number=2,
+                position=putting_dune_pb2.Point2D(x=-6.3, y=0.0),
+            ),
+            putting_dune_pb2.Atom(
+                atomic_number=5,
+                position=putting_dune_pb2.Point2D(x=12.7, y=-0.05),
+            ),
+        ),
+    )
+
+    atomic_grid = microscope_utils.AtomicGrid.from_proto(grid_proto)
+
+    self.assertEqual(atomic_grid.atom_positions.shape, (3, 2))
+    self.assertEqual(atomic_grid.atomic_numbers.shape, (3,))
+    np.testing.assert_allclose(
+        atomic_grid.atom_positions,
+        np.asarray([[1.0, 1.1], [-6.3, 0.0], [12.7, -0.05]]),
+    )
+    np.testing.assert_array_equal(
+        atomic_grid.atomic_numbers, np.asarray([0, 2, 5])
+    )
+
+  def test_beam_control_converts_to_proto(self):
+    control_proto = _BEAM_CONTROL.to_proto()
+
+    self.assertAlmostEqual(control_proto.position.x, 10.0, delta=1e-6)
+    self.assertAlmostEqual(control_proto.position.y, 15.3, delta=1e-6)
+    self.assertAlmostEqual(control_proto.dwell_time_seconds, 1.72, delta=1e-6)
+
+  def test_beam_control_can_be_created_from_proto(self):
+    control_proto = putting_dune_pb2.BeamControl(
+        position=putting_dune_pb2.Point2D(x=10.0, y=15.3),
+        dwell_time_seconds=1.72,
+    )
+    control = microscope_utils.BeamControl.from_proto(control_proto)
+
+    self.assertAlmostEqual(control.position.x, 10.0, delta=1e-6)
+    self.assertAlmostEqual(control.position.y, 15.3, delta=1e-6)
+    self.assertAlmostEqual(control.dwell_time.total_seconds(), 1.72, delta=1e-6)
+
+  def test_field_of_view_converts_to_proto(self):
+    proto_fov = _FOV.to_proto()
+
+    self.assertAlmostEqual(proto_fov.lower_left_angstroms.x, 2.1, delta=1e-6)
+    self.assertAlmostEqual(proto_fov.lower_left_angstroms.y, -6.7, delta=1e-6)
+    self.assertAlmostEqual(proto_fov.upper_right_angstroms.x, 3.2, delta=1e-6)
+    self.assertAlmostEqual(proto_fov.upper_right_angstroms.y, -2.8, delta=1e-6)
+
+  def test_field_of_view_can_be_created_from_proto(self):
+    fov_proto = putting_dune_pb2.FieldOfView(
+        lower_left_angstroms=putting_dune_pb2.Point2D(x=2.1, y=-6.7),
+        upper_right_angstroms=putting_dune_pb2.Point2D(x=3.2, y=-2.8),
+    )
+    fov = microscope_utils.MicroscopeFieldOfView.from_proto(fov_proto)
+
+    self.assertAlmostEqual(fov.lower_left.x, 2.1, delta=1e-6)
+    self.assertAlmostEqual(fov.lower_left.y, -6.7, delta=1e-6)
+    self.assertAlmostEqual(fov.upper_right.x, 3.2, delta=1e-6)
+    self.assertAlmostEqual(fov.upper_right.y, -2.8, delta=1e-6)
+
+  def test_microscope_observation_converts_grid_to_proto(self):
+    grid_proto = _OBSERVATION.to_proto().grid
+
+    self.assertLen(grid_proto.atoms, 2)
+
+    self.assertEqual(grid_proto.atoms[0].atomic_number, 3)
+    self.assertAlmostEqual(grid_proto.atoms[0].position.x, 0.0)
+    self.assertAlmostEqual(grid_proto.atoms[0].position.y, 0.0)
+
+    self.assertEqual(grid_proto.atoms[1].atomic_number, 4)
+    self.assertAlmostEqual(grid_proto.atoms[1].position.x, 1.0)
+    self.assertAlmostEqual(grid_proto.atoms[1].position.y, 2.0)
+
+  def test_microscope_observation_converts_fov_to_proto(self):
+    fov_proto = _OBSERVATION.to_proto().fov
+
+    self.assertAlmostEqual(fov_proto.lower_left_angstroms.x, 2.1, delta=1e-6)
+    self.assertAlmostEqual(fov_proto.lower_left_angstroms.y, -6.7, delta=1e-6)
+    self.assertAlmostEqual(fov_proto.upper_right_angstroms.x, 3.2, delta=1e-6)
+    self.assertAlmostEqual(fov_proto.upper_right_angstroms.y, -2.8, delta=1e-6)
+
+  def test_microscope_observation_converts_controls_to_proto(self):
+    controls_proto = _OBSERVATION.to_proto().controls
+
+    self.assertLen(controls_proto, 2)
+    self.assertAlmostEqual(controls_proto[0].position.x, 10.0, delta=1e-6)
+    self.assertAlmostEqual(controls_proto[0].position.y, 15.3, delta=1e-6)
+    self.assertAlmostEqual(
+        controls_proto[0].dwell_time_seconds, 1.72, delta=1e-6
+    )
+    self.assertAlmostEqual(controls_proto[1].position.x, 10.0, delta=1e-6)
+    self.assertAlmostEqual(controls_proto[1].position.y, 15.3, delta=1e-6)
+    self.assertAlmostEqual(
+        controls_proto[1].dwell_time_seconds, 1.72, delta=1e-6
+    )
+
+  def test_microscope_observation_converts_elapsed_time_to_proto(self):
+    elapsed_time_proto = _OBSERVATION.to_proto().elapsed_time_seconds
+
+    self.assertAlmostEqual(elapsed_time_proto, 6.0, delta=1e-6)
+
+  def test_microscope_observation_converts_image_to_proto(self):
+    image_proto = _OBSERVATION.to_proto().image
+    image_tensor = tf.make_ndarray(image_proto)
+    np.testing.assert_allclose(image_tensor, np.ones((2, 2, 1)))
+
+  def test_microscope_observation_converts_null_image_to_proto(self):
+    proto = _OBSERVATION_WITHOUT_IMAGE.to_proto()
+    observation = microscope_utils.MicroscopeObservation.from_proto(proto)
+    self.assertIsNone(observation.image)
+
+  def test_microscope_observation_can_be_created_from_proto(self):
+    # We already have tests that to_proto works successfully, so
+    # we use it here to make this test much shorted (and easier to follow).
+    observation_proto = _OBSERVATION.to_proto()
+    observation = microscope_utils.MicroscopeObservation.from_proto(
+        observation_proto
+    )
+
+    # Compare grids.
+    with self.subTest('grids'):
+      np.testing.assert_array_equal(
+          observation.grid.atomic_numbers, _OBSERVATION.grid.atomic_numbers
+      )
+      np.testing.assert_allclose(
+          observation.grid.atom_positions, _OBSERVATION.grid.atom_positions
+      )
+
+    # Compare fov.
+    with self.subTest('fov'):
+      np.testing.assert_allclose(
+          np.asarray(observation.fov.lower_left.coords),
+          np.asarray(_OBSERVATION.fov.lower_left.coords),
+      )
+      np.testing.assert_allclose(
+          np.asarray(observation.fov.upper_right.coords),
+          np.asarray(_OBSERVATION.fov.upper_right.coords),
+      )
+
+    # Compare controls.
+    with self.subTest('controls'):
+      self.assertLen(observation.controls, 2)
+      np.testing.assert_allclose(
+          np.asarray(observation.controls[0].position.coords),
+          np.asarray(_OBSERVATION.controls[0].position.coords),
+      )
+      self.assertAlmostEqual(
+          observation.controls[0].dwell_time.total_seconds(),
+          _OBSERVATION.controls[0].dwell_time.total_seconds(),
+          delta=1e-6,
+      )
+
+    # Compare elapsed time.
+    with self.subTest('elapsed_time'):
+      self.assertAlmostEqual(
+          observation.elapsed_time.total_seconds(),
+          _OBSERVATION.elapsed_time.total_seconds(),
+          delta=1e-6,
+      )
+
+    # Compare image.
+    with self.subTest('image'):
+      np.testing.assert_allclose(observation.image, _OBSERVATION.image)
+
+  def test_transition_converts_to_proto(self):
+    transition_proto = _TRANSITION.to_proto()
+
+    with self.subTest('grid_before'):
+      grid_proto = transition_proto.grid_before
+      self.assertLen(grid_proto.atoms, 2)
+
+      self.assertEqual(grid_proto.atoms[0].atomic_number, 3)
+      self.assertAlmostEqual(grid_proto.atoms[0].position.x, 0.0)
+      self.assertAlmostEqual(grid_proto.atoms[0].position.y, 0.0)
+
+      self.assertEqual(grid_proto.atoms[1].atomic_number, 4)
+      self.assertAlmostEqual(grid_proto.atoms[1].position.x, 1.0)
+      self.assertAlmostEqual(grid_proto.atoms[1].position.y, 2.0)
+
+    with self.subTest('grid_after'):
+      grid_proto = transition_proto.grid_after
+      self.assertLen(grid_proto.atoms, 2)
+
+      self.assertEqual(grid_proto.atoms[0].atomic_number, 3)
+      self.assertAlmostEqual(grid_proto.atoms[0].position.x, 0.0)
+      self.assertAlmostEqual(grid_proto.atoms[0].position.y, 0.0)
+
+      self.assertEqual(grid_proto.atoms[1].atomic_number, 4)
+      self.assertAlmostEqual(grid_proto.atoms[1].position.x, 1.0)
+      self.assertAlmostEqual(grid_proto.atoms[1].position.y, 2.0)
+
+    with self.subTest('fov_before'):
+      fov_proto = transition_proto.fov_before
+
+      self.assertAlmostEqual(fov_proto.lower_left_angstroms.x, 2.1, delta=1e-6)
+      self.assertAlmostEqual(fov_proto.lower_left_angstroms.y, -6.7, delta=1e-6)
+      self.assertAlmostEqual(fov_proto.upper_right_angstroms.x, 3.2, delta=1e-6)
+      self.assertAlmostEqual(
+          fov_proto.upper_right_angstroms.y, -2.8, delta=1e-6
+      )
+
+    with self.subTest('fov_after'):
+      fov_proto = transition_proto.fov_after
+
+      self.assertAlmostEqual(fov_proto.lower_left_angstroms.x, 2.1, delta=1e-6)
+      self.assertAlmostEqual(fov_proto.lower_left_angstroms.y, -6.7, delta=1e-6)
+      self.assertAlmostEqual(fov_proto.upper_right_angstroms.x, 3.2, delta=1e-6)
+      self.assertAlmostEqual(
+          fov_proto.upper_right_angstroms.y, -2.8, delta=1e-6
+      )
+
+    with self.subTest('controls'):
+      controls_proto = transition_proto.controls
+
+      self.assertLen(controls_proto, 2)
+      self.assertAlmostEqual(controls_proto[0].position.x, 10.0, delta=1e-6)
+      self.assertAlmostEqual(controls_proto[0].position.y, 15.3, delta=1e-6)
+      self.assertAlmostEqual(
+          controls_proto[0].dwell_time_seconds, 1.72, delta=1e-6
+      )
+      self.assertAlmostEqual(controls_proto[1].position.x, 10.0, delta=1e-6)
+      self.assertAlmostEqual(controls_proto[1].position.y, 15.3, delta=1e-6)
+      self.assertAlmostEqual(
+          controls_proto[1].dwell_time_seconds, 1.72, delta=1e-6
+      )
+
+  def test_transition_can_be_created_from_proto(self):
+    # We already have tests that to_proto works successfully, so
+    # we use it here to make this test much shorted (and easier to follow).
+    transition_proto = _TRANSITION.to_proto()
+    transition = microscope_utils.Transition.from_proto(transition_proto)
+
+    # Compare grid_before.
+    with self.subTest('grid_before'):
+      np.testing.assert_array_equal(
+          transition.grid_before.atomic_numbers,
+          _TRANSITION.grid_before.atomic_numbers,
+      )
+      np.testing.assert_allclose(
+          transition.grid_before.atom_positions,
+          _TRANSITION.grid_before.atom_positions,
+      )
+
+    # Compare grid_after.
+    with self.subTest('grid_before'):
+      np.testing.assert_array_equal(
+          transition.grid_after.atomic_numbers,
+          _TRANSITION.grid_after.atomic_numbers,
+      )
+      np.testing.assert_allclose(
+          transition.grid_after.atom_positions,
+          _TRANSITION.grid_after.atom_positions,
+      )
+
+    # Compare fov_before.
+    with self.subTest('fov_before'):
+      np.testing.assert_allclose(
+          np.asarray(transition.fov_before.lower_left.coords),
+          np.asarray(_TRANSITION.fov_before.lower_left.coords),
+      )
+      np.testing.assert_allclose(
+          np.asarray(transition.fov_before.upper_right.coords),
+          np.asarray(_TRANSITION.fov_before.upper_right.coords),
+      )
+
+    # Compare fov_after.
+    with self.subTest('fov_before'):
+      np.testing.assert_allclose(
+          np.asarray(transition.fov_after.lower_left.coords),
+          np.asarray(_TRANSITION.fov_after.lower_left.coords),
+      )
+      np.testing.assert_allclose(
+          np.asarray(transition.fov_after.upper_right.coords),
+          np.asarray(_TRANSITION.fov_after.upper_right.coords),
+      )
+
+    # Compare controls.
+    with self.subTest('controls'):
+      self.assertLen(transition.controls, 2)
+      np.testing.assert_allclose(
+          np.asarray(transition.controls[0].position.coords),
+          np.asarray(_TRANSITION.controls[0].position.coords),
+      )
+      self.assertAlmostEqual(
+          transition.controls[0].dwell_time.total_seconds(),
+          _TRANSITION.controls[0].dwell_time.total_seconds(),
+          delta=1e-6,
+      )
 
   def test_trajectory_can_be_created_from_proto(self):
     # We already have tests that to_proto works successfully, so
@@ -334,7 +643,6 @@ class SimulatorUtilsTest(absltest.TestCase):
           np.testing.assert_allclose(
               observation.image, converted_observation.image
           )
-
 
 
 if __name__ == '__main__':

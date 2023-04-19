@@ -17,11 +17,24 @@
 import dataclasses
 import datetime as dt
 import typing
-from typing import NewType, Tuple, Sequence, Optional
+from typing import NewType, Optional, Sequence, Tuple
 
 import numpy as np
 from putting_dune import geometry
+from putting_dune import putting_dune_pb2
+import tensorflow as tf
 
+
+def shapely_point_to_proto_point(
+    point: geometry.Point,
+) -> putting_dune_pb2.Point2D:
+  return putting_dune_pb2.Point2D(x=point.x, y=point.y)
+
+
+def proto_point_to_shapely_point(
+    point: putting_dune_pb2.Point2D,
+) -> geometry.Point:
+  return geometry.Point((point.x, point.y))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -36,6 +49,39 @@ class AtomicGrid:
     shift_vector = shift_vector.reshape(1, 2)
     shifted_atom_positions = self.atom_positions + shift_vector
     return AtomicGrid(shifted_atom_positions, self.atomic_numbers)
+
+  @classmethod
+  def from_proto(cls, proto_grid: putting_dune_pb2.AtomicGrid) -> 'AtomicGrid':
+    """Creates an AtomicGrid from a proto."""
+    num_atoms = len(proto_grid.atoms)
+
+    atom_positions = np.empty((num_atoms, 2), dtype=np.float32)
+    atomic_numbers = np.empty(num_atoms, dtype=np.int32)
+
+    for i, atom in enumerate(proto_grid.atoms):
+      atom_positions[i, 0] = atom.position.x
+      atom_positions[i, 1] = atom.position.y
+      atomic_numbers[i] = atom.atomic_number
+
+    return cls(atom_positions, atomic_numbers)
+
+  def to_proto(self) -> putting_dune_pb2.AtomicGrid:
+    """Creates a proto from this object."""
+    num_atoms, _ = self.atom_positions.shape
+
+    grid = putting_dune_pb2.AtomicGrid()
+    for i in range(num_atoms):
+      grid.atoms.append(
+          putting_dune_pb2.Atom(
+              atomic_number=self.atomic_numbers[i],
+              position=putting_dune_pb2.Point2D(
+                  x=self.atom_positions[i, 0],
+                  y=self.atom_positions[i, 1],
+              ),
+          )
+      )
+
+    return grid
 
 
 AtomicGridMaterialFrame = NewType('AtomicGridMaterialFrame', AtomicGrid)
@@ -60,6 +106,25 @@ class BeamControl:
     )
     return BeamControl(shifted_position, self.dwell_time)
 
+  @classmethod
+  def from_proto(
+      cls,
+      control: putting_dune_pb2.BeamControl,
+  ) -> 'BeamControl':
+    """Creates a BeamControl object from a proto."""
+
+    position = proto_point_to_shapely_point(control.position)
+    dwell_time = dt.timedelta(seconds=control.dwell_time_seconds)
+
+    return cls(position, dwell_time)
+
+  def to_proto(self) -> putting_dune_pb2.BeamControl:
+    """Creates a proto from this object."""
+    beam_position = putting_dune_pb2.BeamControl(
+        position=shapely_point_to_proto_point(self.position),
+        dwell_time_seconds=self.dwell_time.total_seconds(),
+    )
+    return beam_position
 
 
 BeamControlMaterialFrame = NewType('BeamControlMaterialFrame', BeamControl)
@@ -288,6 +353,21 @@ class MicroscopeFieldOfView:
         AtomicGrid(selected_atom_positions, selected_atomic_numbers)
     )
 
+  @classmethod
+  def from_proto(
+      cls,
+      fov: putting_dune_pb2.FieldOfView,
+  ) -> 'MicroscopeFieldOfView':
+    return cls(
+        lower_left=proto_point_to_shapely_point(fov.lower_left_angstroms),
+        upper_right=proto_point_to_shapely_point(fov.upper_right_angstroms),
+    )
+
+  def to_proto(self) -> putting_dune_pb2.FieldOfView:
+    return putting_dune_pb2.FieldOfView(
+        lower_left_angstroms=shapely_point_to_proto_point(self.lower_left),
+        upper_right_angstroms=shapely_point_to_proto_point(self.upper_right),
+    )
 
 
 class SimulatorObserver:
@@ -332,6 +412,46 @@ class MicroscopeObservation:
   elapsed_time: dt.timedelta
   image: Optional[np.ndarray] = None
 
+  @classmethod
+  def from_proto(
+      cls,
+      observation: putting_dune_pb2.MicroscopeObservation,
+  ) -> 'MicroscopeObservation':
+    """Instantiates a MicroscopeObservation from the corresponding proto.
+
+    Args:
+      observation: An observation proto.
+
+    Returns:
+      An observation as a dataclass object.
+    """
+    controls = tuple(
+        BeamControlMicroscopeFrame(BeamControl.from_proto(control))
+        for control in observation.controls
+    )
+    image = observation.image
+    if image is not None and image.dtype != 0:
+      image = tf.make_ndarray(image)
+    else:
+      image = None
+    return cls(
+        grid=AtomicGridMicroscopeFrame(AtomicGrid.from_proto(observation.grid)),
+        fov=MicroscopeFieldOfView.from_proto(observation.fov),
+        controls=controls,
+        elapsed_time=dt.timedelta(seconds=observation.elapsed_time_seconds),
+        image=image,
+    )
+
+  def to_proto(self) -> putting_dune_pb2.MicroscopeObservation:
+    controls = [control.to_proto() for control in self.controls]
+    image = tf.make_tensor_proto(self.image) if self.image is not None else None
+    return putting_dune_pb2.MicroscopeObservation(
+        grid=self.grid.to_proto(),
+        fov=self.fov.to_proto(),
+        controls=controls,
+        elapsed_time_seconds=self.elapsed_time.total_seconds(),
+        image=image,
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -352,6 +472,38 @@ class Transition:
   fov_after: MicroscopeFieldOfView
   controls: Tuple[BeamControlMicroscopeFrame, ...]
 
+  @classmethod
+  def from_proto(
+      cls,
+      transition: putting_dune_pb2.Transition,
+  ) -> 'Transition':
+    """Creates an AtomicGrid from a proto."""
+    controls = tuple(
+        BeamControlMicroscopeFrame(BeamControl.from_proto(control))
+        for control in transition.controls
+    )
+    return cls(
+        grid_before=AtomicGridMicroscopeFrame(
+            AtomicGrid.from_proto(transition.grid_before)
+        ),
+        grid_after=AtomicGridMicroscopeFrame(
+            AtomicGrid.from_proto(transition.grid_after)
+        ),
+        fov_before=MicroscopeFieldOfView.from_proto(transition.fov_before),
+        fov_after=MicroscopeFieldOfView.from_proto(transition.fov_after),
+        controls=controls,
+    )
+
+  def to_proto(self) -> putting_dune_pb2.Transition:
+    """Creates a proto from this object."""
+    controls = [control.to_proto() for control in self.controls]
+    return putting_dune_pb2.Transition(
+        grid_before=self.grid_before.to_proto(),
+        grid_after=self.grid_after.to_proto(),
+        fov_before=self.fov_before.to_proto(),
+        fov_after=self.fov_after.to_proto(),
+        controls=controls,
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -364,6 +516,24 @@ class Trajectory:
 
   observations: Sequence[MicroscopeObservation]
 
+  @classmethod
+  def from_proto(
+      cls,
+      trajectory: putting_dune_pb2.Trajectory,
+  ) -> 'Trajectory':
+    """Creates a Trajectory from a proto."""
+    observations = tuple(
+        MicroscopeObservation.from_proto(obs) for obs in trajectory.observations
+    )
+    return cls(
+        observations=observations,
+    )
+
+  def to_proto(self) -> putting_dune_pb2.Trajectory:
+    """Creates a proto from this object."""
+    return putting_dune_pb2.Trajectory(
+        observations=[obs.to_proto() for obs in self.observations],
+    )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -411,6 +581,35 @@ class Drift:
     )
     return shifted_observation
 
+  @classmethod
+  def from_proto(cls, proto_drift: putting_dune_pb2.Drift) -> 'Drift':
+    """Creates a Drift object from a proto."""
+    num_atoms = len(proto_drift.jitter)
+
+    jitter = np.empty((num_atoms, 2), dtype=np.float32)
+    drift = np.empty(2, dtype=np.int32)
+
+    for i, atom in enumerate(proto_drift.jitter):
+      jitter[i, 0] = atom.x
+      jitter[i, 1] = atom.y
+    drift[0] = proto_drift.drift.x
+    drift[1] = proto_drift.drift.y
+
+    return cls(jitter=jitter, drift=drift)
+
+  def to_proto(self) -> putting_dune_pb2.Drift:
+    """Creates a proto from this object."""
+    num_atoms = self.jitter.shape[0]
+
+    proto_jitter = [
+        putting_dune_pb2.Point2D(x=self.jitter[i, 0], y=self.jitter[i, 1])
+        for i in range(num_atoms)
+    ]
+    proto_drift = putting_dune_pb2.Point2D(
+        x=self.drift[0], y=self.drift[1]
+    )
+    drift = putting_dune_pb2.Drift(jitter=proto_jitter, drift=proto_drift)
+    return drift
 
 
 @dataclasses.dataclass(frozen=True)
@@ -425,3 +624,22 @@ class LabeledAlignmentTrajectory:
   trajectory: Trajectory
   drifts: Sequence[Drift]
 
+  @classmethod
+  def from_proto(
+      cls,
+      labeled_trajectory: putting_dune_pb2.LabeledAlignmentTrajectory,
+  ) -> 'LabeledAlignmentTrajectory':
+    """Creates a LabeledAlignmentTrajectory from a proto."""
+    drifts = [Drift.from_proto(drift) for drift in labeled_trajectory.drifts]
+    trajectory = Trajectory.from_proto(labeled_trajectory.trajectory)
+    return cls(
+        trajectory=trajectory,
+        drifts=drifts,
+    )
+
+  def to_proto(self) -> putting_dune_pb2.LabeledAlignmentTrajectory:
+    """Creates a proto from this object."""
+    return putting_dune_pb2.LabeledAlignmentTrajectory(
+        trajectory=self.trajectory.to_proto(),
+        drifts=[drift.to_proto() for drift in self.drifts],
+    )
