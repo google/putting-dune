@@ -211,6 +211,16 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
             max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
         ),
     ),
+    'relative_random_extra_long': experiments.MicroscopeExperiment(
+        get_agent=_get_relative_random_agent,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.0),
+                dt.timedelta(seconds=5.0),
+            ),
+            max_distance_angstroms=3 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ),
+    ),
     'ppo_simple_images_tf': experiments.MicroscopeExperiment(
         get_agent=_GET_PPO_SIMPLE_IMAGES_TF,
         get_adapters_and_goal=_SingleSiliconGoalReachingFromPixels(),
