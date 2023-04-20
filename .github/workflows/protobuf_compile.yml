@@ -1,6 +1,7 @@
 name: Compile Protobuf and Commit
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'putting_dune/*.proto'
@@ -15,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v2
