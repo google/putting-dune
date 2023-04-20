@@ -2,7 +2,7 @@ syntax = "proto2";
 
 package putting_dune.google;
 
-import "third_party/tensorflow/core/framework/tensor.proto";
+import "tensorflow/core/framework/tensor.proto";
 
 message Point2D {
   optional float x = 1;
