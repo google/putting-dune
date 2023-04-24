@@ -122,6 +122,27 @@ _GET_PPO_LEARNED_TF_4S = _TfAgentCreator(
         '230127_from_state_4s.zip'
     ),
 )
+_PPO_V3_TF_2S = _TfAgentCreator(
+    model_name='230422_ppo_v3_2s',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        '230422_ppo_v3_2s.zip'
+    ),
+)
+_PPO_V3_TF_3S = _TfAgentCreator(
+    model_name='230422_ppo_v3_3s',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        '230422_ppo_v3_3s.zip'
+    ),
+)
+_PPO_V3_TF_4S = _TfAgentCreator(
+    model_name='230422_ppo_v3_4s',
+    download_url=(
+        'https://storage.googleapis.com/spr_data_bucket_public/'
+        '230422_ppo_v3_4s.zip'
+    ),
+)
 
 
 
@@ -250,6 +271,43 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
                 dt.timedelta(seconds=1.0),
                 dt.timedelta(seconds=10.0),
             )
+        ),
+    ),
+    # V3 experiments from 04/19/23.
+    'ppo_v3_2s': experiments.MicroscopeExperiment(
+        get_agent=_PPO_V3_TF_2S,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.5),
+                dt.timedelta(seconds=20.0),
+            ),
+            max_distance_angstroms=(
+                constants.CARBON_BOND_DISTANCE_ANGSTROMS * 3
+            ),
+        ),
+    ),
+    'ppo_v3_3s': experiments.MicroscopeExperiment(
+        get_agent=_PPO_V3_TF_3S,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.5),
+                dt.timedelta(seconds=20.0),
+            ),
+            max_distance_angstroms=(
+                constants.CARBON_BOND_DISTANCE_ANGSTROMS * 3
+            ),
+        ),
+    ),
+    'ppo_v3_4s': experiments.MicroscopeExperiment(
+        get_agent=_PPO_V3_TF_4S,
+        get_adapters_and_goal=_SingleSiliconGoalReaching(
+            dwell_time_range=(
+                dt.timedelta(seconds=1.5),
+                dt.timedelta(seconds=20.0),
+            ),
+            max_distance_angstroms=(
+                constants.CARBON_BOND_DISTANCE_ANGSTROMS * 3
+            ),
         ),
     ),
 })
