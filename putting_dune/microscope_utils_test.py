@@ -24,12 +24,18 @@ from putting_dune import putting_dune_pb2
 import tensorflow as tf
 
 
+_IMAGE = np.ones((2, 2, 1))
+_IMAGE_AFTER = np.ones((2, 2, 1)) + 1
+_LABEL_IMAGE = np.ones((2, 2, 3))
+_LABEL_IMAGE_AFTER = np.ones((2, 2, 3)) + 1
 _ATOMIC_GRID = microscope_utils.AtomicGrid(
     np.asarray([[0.0, 0.0], [1.0, 2.0]]), np.asarray([3, 4])
 )
 _BEAM_CONTROL = microscope_utils.BeamControl(
     geometry.Point((10.0, 15.3)),
     dt.timedelta(seconds=1.72),
+    current_na=1,
+    voltage_kv=2,
 )
 _FOV = microscope_utils.MicroscopeFieldOfView(
     lower_left=geometry.Point((2.1, -6.7)),
@@ -43,7 +49,8 @@ _OBSERVATION = microscope_utils.MicroscopeObservation(
         microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
     ),
     elapsed_time=dt.timedelta(seconds=6),
-    image=np.ones((2, 2, 1)),
+    image=_IMAGE,
+    label_image=_LABEL_IMAGE,
 )
 _OBSERVATION_WITHOUT_IMAGE = microscope_utils.MicroscopeObservation(
     grid=microscope_utils.AtomicGridMicroscopeFrame(_ATOMIC_GRID),
@@ -64,6 +71,10 @@ _TRANSITION = microscope_utils.Transition(
         microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
         microscope_utils.BeamControlMicroscopeFrame(_BEAM_CONTROL),
     ),
+    image_before=_IMAGE,
+    image_after=_IMAGE_AFTER,
+    label_image_before=_LABEL_IMAGE,
+    label_image_after=_LABEL_IMAGE_AFTER,
 )
 _TRAJECTORY = microscope_utils.Trajectory(
     observations=[_OBSERVATION, _OBSERVATION_WITHOUT_IMAGE],
@@ -328,12 +339,16 @@ class SimulatorUtilsTest(absltest.TestCase):
     control_proto = putting_dune_pb2.BeamControl(
         position=putting_dune_pb2.Point2D(x=10.0, y=15.3),
         dwell_time_seconds=1.72,
+        voltage_kv=2.,
+        current_na=1.,
     )
     control = microscope_utils.BeamControl.from_proto(control_proto)
 
     self.assertAlmostEqual(control.position.x, 10.0, delta=1e-6)
     self.assertAlmostEqual(control.position.y, 15.3, delta=1e-6)
     self.assertAlmostEqual(control.dwell_time.total_seconds(), 1.72, delta=1e-6)
+    self.assertAlmostEqual(control.voltage_kv, 2., delta=1e-6)
+    self.assertAlmostEqual(control.current_na, 1., delta=1e-6)
 
   def test_field_of_view_converts_to_proto(self):
     proto_fov = _FOV.to_proto()
@@ -405,6 +420,7 @@ class SimulatorUtilsTest(absltest.TestCase):
     proto = _OBSERVATION_WITHOUT_IMAGE.to_proto()
     observation = microscope_utils.MicroscopeObservation.from_proto(proto)
     self.assertIsNone(observation.image)
+    self.assertIsNone(observation.label_image)
 
   def test_microscope_observation_can_be_created_from_proto(self):
     # We already have tests that to_proto works successfully, so
@@ -458,6 +474,9 @@ class SimulatorUtilsTest(absltest.TestCase):
     # Compare image.
     with self.subTest('image'):
       np.testing.assert_allclose(observation.image, _OBSERVATION.image)
+    with self.subTest('label_image'):
+      np.testing.assert_allclose(observation.label_image,
+                                 _OBSERVATION.label_image)
 
   def test_transition_converts_to_proto(self):
     transition_proto = _TRANSITION.to_proto()
@@ -520,6 +539,8 @@ class SimulatorUtilsTest(absltest.TestCase):
       self.assertAlmostEqual(
           controls_proto[1].dwell_time_seconds, 1.72, delta=1e-6
       )
+      self.assertAlmostEqual(controls_proto[0].voltage_kv, 2.0, delta=1e-6)
+      self.assertAlmostEqual(controls_proto[0].current_na, 1.0, delta=1e-6)
 
   def test_transition_can_be_created_from_proto(self):
     # We already have tests that to_proto works successfully, so
@@ -583,6 +604,28 @@ class SimulatorUtilsTest(absltest.TestCase):
           _TRANSITION.controls[0].dwell_time.total_seconds(),
           delta=1e-6,
       )
+      self.assertAlmostEqual(
+          transition.controls[0].current_na,
+          _TRANSITION.controls[0].current_na,
+          delta=1e-6,
+      )
+      self.assertAlmostEqual(
+          transition.controls[0].voltage_kv,
+          _TRANSITION.controls[0].voltage_kv,
+          delta=1e-6,
+      )
+
+    with self.subTest('image'):
+      np.testing.assert_allclose(transition.image_before,
+                                 _TRANSITION.image_before)
+      np.testing.assert_allclose(transition.image_after,
+                                 _TRANSITION.image_after)
+
+    with self.subTest('label_image'):
+      np.testing.assert_allclose(transition.label_image_before,
+                                 _TRANSITION.label_image_before)
+      np.testing.assert_allclose(transition.label_image_after,
+                                 _TRANSITION.label_image_after)
 
   def test_trajectory_can_be_created_from_proto(self):
     # We already have tests that to_proto works successfully, so
@@ -626,6 +669,16 @@ class SimulatorUtilsTest(absltest.TestCase):
             converted_observation.controls[0].dwell_time.total_seconds(),
             delta=1e-6,
         )
+        self.assertAlmostEqual(
+            observation.controls[0].current_na,
+            converted_observation.controls[0].current_na,
+            delta=1e-6,
+        )
+        self.assertAlmostEqual(
+            observation.controls[0].voltage_kv,
+            converted_observation.controls[0].voltage_kv,
+            delta=1e-6,
+        )
 
       # Compare elapsed time.
       with self.subTest('elapsed_time'):
@@ -643,6 +696,15 @@ class SimulatorUtilsTest(absltest.TestCase):
           np.testing.assert_allclose(
               observation.image, converted_observation.image
           )
+
+      with self.subTest('label_image'):
+        if observation.label_image is None:
+          self.assertIsNone(converted_observation.label_image)
+        else:
+          np.testing.assert_allclose(
+              observation.label_image, converted_observation.label_image
+          )
+
 
 
 if __name__ == '__main__':

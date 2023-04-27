@@ -22,6 +22,8 @@ message AtomicGrid {
 message BeamControl {
   optional Point2D position = 1;
   optional float dwell_time_seconds = 2;
+  optional float voltage_kv = 3;
+  optional float current_na = 4;
 }
 
 message FieldOfView {
@@ -36,6 +38,7 @@ message MicroscopeObservation {
   // The total elapsed time since the beginning of the episode.
   optional float elapsed_time_seconds = 4;
   optional tensorflow.TensorProto image = 5;
+  optional tensorflow.TensorProto label_image = 6;
 }
 
 message Trajectory {
@@ -50,6 +53,12 @@ message Transition {
   optional FieldOfView fov_after = 4;
 
   repeated BeamControl controls = 5;
+
+  optional tensorflow.TensorProto image_before = 6;
+  optional tensorflow.TensorProto image_after = 7;
+
+  optional tensorflow.TensorProto label_image_before = 8;
+  optional tensorflow.TensorProto label_image_after = 9;
 }
 
 message Drift {

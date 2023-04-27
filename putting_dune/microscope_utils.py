@@ -95,16 +95,22 @@ class BeamControl:
   Attributes:
     position: Point describing the beam position.
     dwell_time: Beam dwell time.
+    voltage_kv: Beam voltage, in kilovolts.
+    current_na: Beam current, in nanoamperes
   """
 
   position: geometry.Point
   dwell_time: dt.timedelta
+  voltage_kv: Optional[float] = 60  # most data was gathered at 60kV.
+  current_na: Optional[float] = 0.1  # typical current in real data.
 
   def shift(self, shift: geometry.Point) -> 'BeamControl':
     shifted_position = geometry.Point(
         self.position.x + shift.x, self.position.y + shift.y
     )
-    return BeamControl(shifted_position, self.dwell_time)
+    return BeamControl(
+        shifted_position, self.dwell_time, self.voltage_kv, self.current_na
+    )
 
   @classmethod
   def from_proto(
@@ -116,13 +122,15 @@ class BeamControl:
     position = proto_point_to_shapely_point(control.position)
     dwell_time = dt.timedelta(seconds=control.dwell_time_seconds)
 
-    return cls(position, dwell_time)
+    return cls(position, dwell_time, control.voltage_kv, control.current_na)
 
   def to_proto(self) -> putting_dune_pb2.BeamControl:
     """Creates a proto from this object."""
     beam_position = putting_dune_pb2.BeamControl(
         position=shapely_point_to_proto_point(self.position),
         dwell_time_seconds=self.dwell_time.total_seconds(),
+        voltage_kv=self.voltage_kv,
+        current_na=self.current_na,
     )
     return beam_position
 
@@ -255,7 +263,9 @@ class MicroscopeFieldOfView:
           point.position.x * scale[0, 0] + lower_left[0, 0],
           point.position.y * scale[0, 1] + lower_left[0, 1],
       ))
-      return BeamControl(position, point.dwell_time)
+      return BeamControl(
+          position, point.dwell_time, point.voltage_kv, point.current_na
+      )
 
     raise NotImplementedError(f'Point of type {type(point)} is not supported.')
 
@@ -310,7 +320,12 @@ class MicroscopeFieldOfView:
           (point.position.x - lower_left[0, 0]) / scale[0, 0],
           (point.position.y - lower_left[0, 1]) / scale[0, 1],
       ))
-      return BeamControl(position, point.dwell_time)
+      return BeamControl(
+          position,
+          point.dwell_time,
+          voltage_kv=point.voltage_kv,
+          current_na=point.current_na,
+      )
 
     raise NotImplementedError(f'Point of type {type(point)} is not supported.')
 
@@ -411,6 +426,7 @@ class MicroscopeObservation:
   controls: Tuple[BeamControlMicroscopeFrame, ...]
   elapsed_time: dt.timedelta
   image: Optional[np.ndarray] = None
+  label_image: Optional[np.ndarray] = None
 
   @classmethod
   def from_proto(
@@ -434,23 +450,35 @@ class MicroscopeObservation:
       image = tf.make_ndarray(image)
     else:
       image = None
+    label_image = observation.label_image
+    if label_image is not None and label_image.dtype != 0:
+      label_image = tf.make_ndarray(label_image)
+    else:
+      label_image = None
     return cls(
         grid=AtomicGridMicroscopeFrame(AtomicGrid.from_proto(observation.grid)),
         fov=MicroscopeFieldOfView.from_proto(observation.fov),
         controls=controls,
         elapsed_time=dt.timedelta(seconds=observation.elapsed_time_seconds),
         image=image,
+        label_image=label_image,
     )
 
   def to_proto(self) -> putting_dune_pb2.MicroscopeObservation:
     controls = [control.to_proto() for control in self.controls]
     image = tf.make_tensor_proto(self.image) if self.image is not None else None
+    label_image = (
+        tf.make_tensor_proto(self.label_image)
+        if self.label_image is not None
+        else None
+    )
     return putting_dune_pb2.MicroscopeObservation(
         grid=self.grid.to_proto(),
         fov=self.fov.to_proto(),
         controls=controls,
         elapsed_time_seconds=self.elapsed_time.total_seconds(),
         image=image,
+        label_image=label_image,
     )
 
 
@@ -464,6 +492,10 @@ class Transition:
     fov_before: The FOV before the transition.
     fov_after: The FOV after the transition.
     controls: Beam controls applied during the transition.
+    image_before: Observed image before the transition (optional).
+    image_after: Observed image after the transition (optional).
+    label_image_before: Labeled image before the transition (optional).
+    label_image_after: Labeled image after the transition (optional).
   """
 
   grid_before: AtomicGridMicroscopeFrame
@@ -471,6 +503,10 @@ class Transition:
   fov_before: MicroscopeFieldOfView
   fov_after: MicroscopeFieldOfView
   controls: Tuple[BeamControlMicroscopeFrame, ...]
+  image_before: Optional[np.ndarray] = None
+  image_after: Optional[np.ndarray] = None
+  label_image_before: Optional[np.ndarray] = None
+  label_image_after: Optional[np.ndarray] = None
 
   @classmethod
   def from_proto(
@@ -482,6 +518,31 @@ class Transition:
         BeamControlMicroscopeFrame(BeamControl.from_proto(control))
         for control in transition.controls
     )
+
+    image_before = transition.image_before
+    if image_before is not None and image_before.dtype != 0:
+      image_before = tf.make_ndarray(image_before)
+    else:
+      image_before = None
+
+    image_after = transition.image_after
+    if image_after is not None and image_after.dtype != 0:
+      image_after = tf.make_ndarray(image_after)
+    else:
+      image_after = None
+
+    label_image_before = transition.label_image_before
+    if label_image_before is not None and label_image_before.dtype != 0:
+      label_image_before = tf.make_ndarray(label_image_before)
+    else:
+      label_image_before = None
+
+    label_image_after = transition.label_image_after
+    if label_image_after is not None and label_image_after.dtype != 0:
+      label_image_after = tf.make_ndarray(label_image_after)
+    else:
+      label_image_after = None
+
     return cls(
         grid_before=AtomicGridMicroscopeFrame(
             AtomicGrid.from_proto(transition.grid_before)
@@ -492,17 +553,47 @@ class Transition:
         fov_before=MicroscopeFieldOfView.from_proto(transition.fov_before),
         fov_after=MicroscopeFieldOfView.from_proto(transition.fov_after),
         controls=controls,
+        image_before=image_before,
+        image_after=image_after,
+        label_image_before=label_image_before,
+        label_image_after=label_image_after,
     )
 
   def to_proto(self) -> putting_dune_pb2.Transition:
     """Creates a proto from this object."""
     controls = [control.to_proto() for control in self.controls]
+    image_before = (
+        tf.make_tensor_proto(self.image_before)
+        if self.image_before is not None
+        else None
+    )
+    image_after = (
+        tf.make_tensor_proto(self.image_after)
+        if self.image_after is not None
+        else None
+    )
+
+    label_image_before = (
+        tf.make_tensor_proto(self.label_image_before)
+        if self.image_before is not None
+        else None
+    )
+    label_image_after = (
+        tf.make_tensor_proto(self.label_image_after)
+        if self.image_after is not None
+        else None
+    )
+
     return putting_dune_pb2.Transition(
         grid_before=self.grid_before.to_proto(),
         grid_after=self.grid_after.to_proto(),
         fov_before=self.fov_before.to_proto(),
         fov_after=self.fov_after.to_proto(),
         controls=controls,
+        image_before=image_before,
+        image_after=image_after,
+        label_image_before=label_image_before,
+        label_image_after=label_image_after,
     )
 
 
