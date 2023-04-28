@@ -15,8 +15,9 @@
 """Doped graphene materials."""
 
 import abc
+import dataclasses
 import datetime as dt
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Sequence
 
 from absl import logging
 from jax.scipy import stats
@@ -25,6 +26,30 @@ from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import microscope_utils
 from sklearn import neighbors
+
+
+@dataclasses.dataclass(frozen=True)
+class SuccessorState:
+  grid: microscope_utils.AtomicGridMaterialFrame
+  rate: float
+
+
+@dataclasses.dataclass(frozen=True)
+class Rates:
+  successor_states: Sequence[SuccessorState]
+
+  @property
+  def total_rate(self) -> float:
+    return sum([x.rate for x in self.successor_states])
+
+
+RateFunction = Callable[
+    [
+        microscope_utils.AtomicGridMaterialFrame,
+        geometry.PointMaterialFrame,
+    ],
+    Rates,
+]
 
 
 class SiliconNotFoundError(RuntimeError):

@@ -14,6 +14,8 @@
 
 """Geometry manipulations."""
 
+from typing import NewType
+
 from jax import numpy as jnp
 import numpy as np
 from shapely import geometry as shapely_geometry
@@ -22,6 +24,8 @@ from shapely import geometry as shapely_geometry
 # an alias here to avoid a name overlap between our geometry module
 # and shapelys.
 Point = shapely_geometry.Point
+PointMicroscopeFrame = NewType('PointMicroscopeFrame', Point)
+PointMaterialFrame = NewType('PointMaterialFrame', Point)
 
 
 def get_angles(coordinates: np.ndarray) -> np.ndarray:
