@@ -23,6 +23,7 @@ from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
+from sklearn import neighbors
 
 _ARBITRARY_CONTROL = microscope_utils.BeamControlMaterialFrame(
     microscope_utils.BeamControl(
@@ -36,6 +37,37 @@ class GrapheneTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.rng = np.random.default_rng(0)
+
+  def test_generate_pristine_graphene_has_correct_scale(self):
+    positions = graphene.generate_pristine_graphene(self.rng)
+
+    # Choose a position near the middle of the sheet.
+    sq_distances = np.sum(positions**2, axis=1)
+    middle_idx = np.argmin(sq_distances)
+    middle_position = positions[middle_idx]
+
+    # Get the neighbors of that position.
+    neighbor_distances, _ = (
+        neighbors.NearestNeighbors(
+            n_neighbors=1 + 3,
+            metric='l2',
+            algorithm='brute',
+        )
+        .fit(positions)
+        .kneighbors(middle_position.reshape(1, 2))
+    )
+    neighbor_distances = neighbor_distances.reshape(-1)
+
+    self.assertEqual(neighbor_distances[0], 0.0)  # Self-distance.
+    self.assertAlmostEqual(
+        neighbor_distances[1], constants.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
+    self.assertAlmostEqual(
+        neighbor_distances[2], constants.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
+    self.assertAlmostEqual(
+        neighbor_distances[3], constants.CARBON_BOND_DISTANCE_ANGSTROMS
+    )
 
   def test_atoms_in_graphene_are_a_fixed_distance_apart(self):
     material = graphene.PristineSingleDopedGraphene()

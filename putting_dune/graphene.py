@@ -244,6 +244,35 @@ def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
   return np.stack((coord_x, coord_y), axis=1)
 
 
+def generate_pristine_graphene(
+    rng: np.random.Generator, num_columns: int = 50
+) -> np.ndarray:
+  """Generates the positions of carbon atoms in a pristine graphene sheet."""
+  positions = _generate_hexagonal_grid(num_columns)
+
+  # Scale the positions to have the correct distance.
+  positions = positions * constants.CARBON_BOND_DISTANCE_ANGSTROMS
+
+  # Center the grid, but add a small random offset.
+  positions = positions - np.mean(positions, axis=0, keepdims=True)
+  positions += rng.uniform(
+      -constants.CARBON_BOND_DISTANCE_ANGSTROMS / 2,
+      constants.CARBON_BOND_DISTANCE_ANGSTROMS / 2,
+      size=(1, 2),
+  )
+
+  # Apply a random rotation to the grid.
+  rotation_angle = rng.uniform(0.0, 2 * np.pi)
+  rotation_matrix = np.asarray([
+      [np.cos(rotation_angle), -np.sin(rotation_angle)],
+      [np.sin(rotation_angle), np.cos(rotation_angle)],
+  ])
+  # Apply the rotation matrix on the rhs, since grid is shape (num_atoms, 2).
+  positions = positions @ rotation_matrix
+
+  return positions
+
+
 # A function that takes an atomic grid representing the current material
 # state, a probe position, a silicon atom position, and positions of the
 # 3 nearest neighbors, and returns the rate at which the silicon atom
@@ -284,23 +313,7 @@ class PristineSingleDopedGraphene(Material):
   def reset(self, rng: np.random.Generator) -> None:
     self._has_been_reset = True
 
-    grid = _generate_hexagonal_grid(self._grid_columns)
-
-    # Scale the grid to have the correct cell distance.
-    grid = grid * constants.CARBON_BOND_DISTANCE_ANGSTROMS
-
-    # Center the grid.
-    # TODO(joshgreaves): Maybe add a small randomly generated offset.
-    grid = grid - np.mean(grid, axis=0, keepdims=True)
-
-    # Apply a random rotation to the grid.
-    rotation_angle = rng.uniform(0.0, 2 * np.pi)
-    rotation_matrix = np.asarray([
-        [np.cos(rotation_angle), -np.sin(rotation_angle)],
-        [np.sin(rotation_angle), np.cos(rotation_angle)],
-    ])
-    # Apply the rotation matrix on the rhs, since grid is shape (num_atoms, 2).
-    self.atom_positions = grid @ rotation_matrix
+    self.atom_positions = generate_pristine_graphene(rng, self._grid_columns)
 
     self.nearest_neighbors = neighbors.NearestNeighbors(
         n_neighbors=1 + 3,
