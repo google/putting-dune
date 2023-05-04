@@ -23,6 +23,7 @@ from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
+from putting_dune import test_utils
 from sklearn import neighbors
 
 _ARBITRARY_CONTROL = microscope_utils.BeamControlMaterialFrame(
@@ -284,6 +285,26 @@ class GrapheneTest(absltest.TestCase):
     material.reset(self.rng)
 
     material.apply_control(self.rng, _ARBITRARY_CONTROL)
+
+
+class PristineSingleSiGrRatePredictorTest(absltest.TestCase):
+
+  def test_predictor_returns_3_rates(self):
+    rng = np.random.default_rng(0)
+    predictor = graphene.PristineSingleSiGrRatePredictor(
+        graphene.simple_transition_rates
+    )
+    grid = test_utils.create_single_silicon_pristine_sigr(rng)
+
+    # Set a control near the silicon position.
+    si_pos = grid.atom_positions[grid.atomic_numbers == constants.SILICON]
+    control_position = geometry.PointMaterialFrame(
+        geometry.Point(si_pos.reshape(-1))
+    )
+
+    predicted_rates = predictor(grid, control_position)
+
+    self.assertLen(predicted_rates, 3)
 
 
 if __name__ == '__main__':

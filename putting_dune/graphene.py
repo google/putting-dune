@@ -17,7 +17,7 @@
 import abc
 import dataclasses
 import datetime as dt
-from typing import Callable, Iterable, Sequence
+from typing import Callable, List, Iterable, Sequence
 
 from absl import logging
 from jax.scipy import stats
@@ -277,6 +277,7 @@ def generate_pristine_graphene(
 # state, a probe position, a silicon atom position, and positions of the
 # 3 nearest neighbors, and returns the rate at which the silicon atom
 # swaps places with its nearest neighbors.
+# TODO(joshgreaves): Delete this once the interfaces have been updated.
 RatePredictionFn = Callable[
     [
         microscope_utils.AtomicGridMaterialFrame,
@@ -286,6 +287,69 @@ RatePredictionFn = Callable[
     ],
     np.ndarray,
 ]
+CanonicalRatePredictionFn = Callable[
+    [
+        microscope_utils.AtomicGridMaterialFrame,
+        geometry.PointMaterialFrame,
+        np.ndarray,
+        np.ndarray,
+    ],
+    np.ndarray,
+]
+
+
+@dataclasses.dataclass(frozen=True)
+class PristineSingleSiGrRatePredictor:
+  """A single silicon, pristine graphene rate predictor."""
+
+  canonical_rate_prediction_fn: CanonicalRatePredictionFn
+
+  def __call__(
+      self,
+      grid: microscope_utils.AtomicGridMaterialFrame,
+      beam_position: geometry.PointMaterialFrame,
+  ) -> List[SuccessorState]:
+    silicon_position = get_single_silicon_position(grid)
+
+    _, si_neighbor_indices = (
+        neighbors.NearestNeighbors(
+            n_neighbors=1 + 3,
+            metric='l2',
+            algorithm='brute',
+        )
+        .fit(grid.atom_positions)
+        .kneighbors(silicon_position.reshape(1, 2))
+    )
+
+    # Get the nearest neighbors, ignoring the silicon atom.
+    si_neighbor_indices = si_neighbor_indices[0, 1:]
+
+    transition_rates = self.canonical_rate_prediction_fn(
+        grid,
+        beam_position,
+        silicon_position,
+        si_neighbor_indices,
+    )
+    transition_rates = np.asarray(transition_rates).astype(np.float32)
+
+    assert (transition_rates >= 0).all(), 'transition_rates were not positive.'
+
+    # Create successor grids associated with the rates.
+    atom_positions = grid.atom_positions  # Atom positions remain fixed.
+    successor_states = []
+    for next_si_idx, rate in zip(si_neighbor_indices, transition_rates):
+      atomic_numbers = np.full_like(grid.atomic_numbers, constants.CARBON)
+      atomic_numbers[next_si_idx] = constants.SILICON
+      successor_states.append(
+          SuccessorState(
+              microscope_utils.AtomicGridMaterialFrame(
+                  microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+              ),
+              rate,
+          )
+      )
+
+    return successor_states
 
 
 class PristineSingleDopedGraphene(Material):
@@ -463,7 +527,7 @@ def get_silicon_positions(grid: microscope_utils.AtomicGrid) -> np.ndarray:
 
 
 def get_single_silicon_position(
-    grid: microscope_utils.AtomicGridMicroscopeFrame,
+    grid: microscope_utils.AtomicGrid,
 ) -> np.ndarray:
   """Gets the silicon position, assuming there is only one.
 

@@ -18,6 +18,7 @@ import datetime as dt
 from typing import Any
 
 import numpy as np
+from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import imaging
@@ -68,3 +69,15 @@ def create_single_silicon_observation(
   )
 
   return observation
+
+
+def create_single_silicon_pristine_sigr(
+    rng: np.random.Generator,
+) -> microscope_utils.AtomicGridMaterialFrame:
+  # Set up a grid.
+  atom_positions = graphene.generate_pristine_graphene(rng)
+  atomic_numbers = np.full((atom_positions.shape[0],), constants.CARBON)
+  si_idx = np.argmax(np.sum(atom_positions**2, axis=1))  # Nearest (0, 0)
+  atomic_numbers[si_idx] = constants.SILICON
+  grid = microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+  return microscope_utils.AtomicGridMaterialFrame(grid)
