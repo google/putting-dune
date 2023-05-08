@@ -47,9 +47,9 @@ def sample_image_parameters(rng: np.random.Generator, image_size: int = 512):
       poisson_rate_multiplier=rng.exponential(15) + 1.0,
       salt_and_pepper_amount=rng.uniform(0.0, 1e-3),
       blur_amount=rng.uniform(0.0, 1.0),
-      contrast_gamma=rng.uniform(0.6, 1.0),
-      exponential_lambda=rng.uniform(0.0, 0.1),
-      uniform_noise_scale=rng.uniform(0.0, 0.1),
+      contrast_gamma=rng.uniform(0.7, 1.3),
+      exponential_lambda=rng.uniform(0.0, 0.2),
+      uniform_noise_scale=rng.uniform(0.0, 0.2),
       image_size=image_size,
   )
 
@@ -65,9 +65,9 @@ def sample_noisy_image_parameters(
       poisson_rate_multiplier=rng.exponential(15) + 1.0,
       salt_and_pepper_amount=rng.uniform(0.0, 1e-2),
       blur_amount=rng.uniform(0.0, 0.25),
-      contrast_gamma=rng.uniform(0.1, 1.0),
-      exponential_lambda=rng.uniform(0.0, 0.15),
-      uniform_noise_scale=rng.uniform(0.0, 0.15),
+      contrast_gamma=rng.uniform(0.5, 1.5),
+      exponential_lambda=rng.uniform(0.0, 0.25),
+      uniform_noise_scale=rng.uniform(0.0, 0.25),
       image_size=image_size,
   )
 
@@ -158,7 +158,7 @@ def generate_clean_image(
   # For example, at 512 pixels with 20 angstrom FOV => sigma = 12
   # => sigma = 200 / FOV ~= image_size / (2 * FOV)
   # Empirically, this looks about right.
-  sigma = (image_size / (2 * fov_width), image_size / (2 * fov_height))
+  sigma = (image_size / (2.15 * fov_width), image_size / (2.15 * fov_height))
 
   image = ndimage.gaussian_filter(image, sigma, mode='constant')
 
@@ -177,7 +177,10 @@ def apply_gaussian_noise(
     image: np.ndarray, variance: float, rng: np.random.Generator
 ) -> np.ndarray:
   noisy_image = skimage.util.random_noise(
-      image, mode='gaussian', var=variance, seed=rng
+      image,
+      mode='gaussian',
+      var=variance,
+      seed=rng,
   )
   return noisy_image
 
@@ -248,13 +251,15 @@ def generate_stem_image(
       intensity_exponent=image_params.intensity_exponent,
       buffer_size=buffer_size,
   )
+  image = apply_blur(image, image_params.blur_amount)
   image = apply_poisson_noise(image, image_params.poisson_rate_multiplier, rng)
   image = apply_jitter(image, image_params.jitter_rate, rng)
   image = apply_salt_and_pepper_noise(
       image, image_params.salt_and_pepper_amount, rng
   )
+  image = apply_contrast(image, image_params.contrast_gamma)
   image = apply_uniform_noise(image, image_params.uniform_noise_scale, rng)
   image = apply_exponential_noise(image, image_params.exponential_lambda, rng)
-  image = apply_contrast(image, image_params.contrast_gamma)
   image = apply_gaussian_noise(image, image_params.gaussian_variance, rng)
+  image = exposure.equalize_adapthist(image, clip_limit=0.01)
   return image
