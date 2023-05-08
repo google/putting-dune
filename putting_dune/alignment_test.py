@@ -135,24 +135,28 @@ class IteratedAlignmentTest(parameterized.TestCase):
     observation = microscope_utils.AtomicGrid(
         material.atom_positions, material.atomic_numbers
     )
+    observation = microscope_utils.AtomicGridMaterialFrame(observation)
 
     drift = np.array([0.1, 0.1])
     shifts = np.stack([drift] * 10, 0).cumsum(0)
-    aligner.align(observation)
+    aligner(observation)
     cumulative_shift = np.zeros_like(drift)
 
     for shift in shifts:
       shifted_observation = observation.shift(-shift)
       shifted_observation = shifted_observation.shift(cumulative_shift)
-      joined_observation, assessed_shift = aligner.align(shifted_observation)
-      cumulative_shift += assessed_shift
+      shifted_observation = microscope_utils.AtomicGridMaterialFrame(
+          shifted_observation
+      )
+      joined_observation, assessed_shift = aligner(shifted_observation)
+      cumulative_shift -= assessed_shift
       reference_coordinates = aligner.recent_observations[0]
       np.testing.assert_allclose(
           np.sort((joined_observation.atom_positions).reshape(-1)),
           np.sort(reference_coordinates.reshape(-1)),
           atol=1e-3,
       )
-      np.testing.assert_allclose(assessed_shift, drift, atol=1e-3)
+      np.testing.assert_allclose(-assessed_shift, drift, atol=1e-3)
 
 
 if __name__ == '__main__':

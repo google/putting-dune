@@ -14,9 +14,16 @@
 
 """Tools for aligning and postprocessing microscope observations."""
 
+import collections
 import copy
-from typing import Optional
+import functools
+import io
+from typing import Any, Deque, Optional, Sequence, Tuple
+import urllib
+import zipfile
 
+import cv2
+from etils import epath
 import networkx as nx
 import numpy as np
 from putting_dune import constants
@@ -24,7 +31,9 @@ from putting_dune import geometry
 from putting_dune import microscope_utils
 import scipy.spatial
 import scipy.stats
+from skimage import exposure
 from sklearn import cluster
+import tensorflow as tf
 
 
 def get_graphene_scale_factor(coordinates: np.ndarray) -> float:
@@ -84,7 +93,7 @@ def align_latest(
     max_shift: float = 2.0,
     mask_above: float = np.inf,
     trim: float = 0.0,
-    init_shift: Optional[np.ndarray] = None,
+    init_shift: Optional[np.ndarray] = np.zeros((2,)),
 ) -> np.ndarray:
   """Calculates a vector that will align coordinates with a reference.
 
@@ -111,18 +120,17 @@ def align_latest(
     added to new_coordinates or subtracted from reference_coordinates.
   """
   if init_shift is None:
-    cum_shift = np.zeros(new_coordinates.shape[-1])
+    cumulative_drift = np.zeros(new_coordinates.shape[-1])
   else:
-    cum_shift = init_shift
+    cumulative_drift = init_shift
   noise_scales = np.linspace(noise_scale, 0, num=iterations)
   class_masks = [new_classes == i for i in set(new_classes)]
   reference_class_masks = [reference_classes == i for i in set(new_classes)]
 
   for i in range(iterations):
     noise_scale = noise_scales[i]
-    noise_shift = 0 if noise_scale == 0 else np.random.normal(size=(2,))
-    noise_shift = noise_scale * noise_shift
-    current_coords = new_coordinates + cum_shift + noise_shift
+    noise = 0 if noise_scale == 0 else np.random.normal(size=(2,)) * noise_scale
+    current_coords = new_coordinates + cumulative_drift + noise
 
     offsets = [
         get_offsets(
@@ -131,13 +139,19 @@ def align_latest(
         for mask, ref_mask in zip(class_masks, reference_class_masks)
     ]
     offsets = np.concatenate(offsets)
-    shift = scipy.stats.trim_mean(offsets, trim, axis=0)
-    cum_shift += noise_shift + shift
-    norm_shift = np.linalg.norm(cum_shift)
-    if norm_shift > max_shift:
-      cum_shift = max_shift * cum_shift / norm_shift
-    current_coords = new_coordinates + cum_shift
-  return cum_shift
+
+    if trim > 0:
+      distances = np.linalg.norm(offsets, axis=-1)
+      sorted_distances = np.argsort(distances)
+      offsets = offsets[sorted_distances[: int((1 - trim) * len(offsets))]]
+
+    offset = offsets.mean(axis=0)
+    cumulative_drift += noise + offset
+    drift_norm = np.linalg.norm(cumulative_drift)
+    if drift_norm > max_shift:
+      cumulative_drift = max_shift * cumulative_drift / drift_norm
+    current_coords = new_coordinates + cumulative_drift
+  return cumulative_drift
 
 
 def clique_merge(
@@ -187,6 +201,384 @@ def clique_merge(
   return coordinates, counts
 
 
+def pad_and_crop_images_by_fov(
+    image: np.ndarray,
+    original_fov: microscope_utils.MicroscopeFieldOfView,
+    new_fov: microscope_utils.MicroscopeFieldOfView,
+) -> np.ndarray:
+  """Extracts a subimage corresponding to a new FOV from an old observation.
+
+  Args:
+    image: Image (h, w, c) array.
+    original_fov: FOV describing the original image.
+    new_fov: FOV to use to extract a subimage.
+
+  Returns:
+    A sliced version of `image`.
+  """
+
+  if image.ndim == 2:
+    image = np.expand_dims(image, -1)
+
+  original_lower_left = np.array(original_fov.lower_left)
+  new_lower_left = np.array(new_fov.lower_left)
+  original_upper_right = np.array(original_fov.upper_right)
+  new_upper_right = np.array(new_fov.upper_right)
+  original_scale = original_upper_right - original_lower_left
+  new_scale = new_upper_right - new_lower_left
+  resize_factor = original_scale / new_scale
+
+  output_shape = image.shape
+  padding_shape = image.shape
+  array_image_shape = np.array(output_shape)[:-1]
+  array_padding_shape = np.array(padding_shape)[:-1]
+
+  if (resize_factor != 1).any():
+    new_size = np.array(image.shape[:-1]) * resize_factor
+    new_size = tuple(np.round(new_size).astype(np.int32))
+    resized_image = tf.image.resize(
+        image,
+        new_size,
+        method='nearest',
+    )
+  else:
+    resized_image = image
+
+  padded_image = np.pad(
+      resized_image,
+      (
+          (padding_shape[0], padding_shape[0]),
+          (padding_shape[1], padding_shape[1]),
+          (0, 0),
+      ),
+      mode='constant',
+  )
+
+  # The upper-left is actually the privileged point in images, so we find shift
+  # relative to it. Since FOV is square it's just the X from LL and Y from UR.
+  x_shift = new_lower_left[0] - original_lower_left[0]
+  y_shift = new_upper_right[1] - original_upper_right[1]
+
+  # In images the y-direction is the first axis, and the x-direction the second,
+  # and the "y" direction is reversed.
+  shift = np.array([-y_shift, x_shift])
+
+  # Convert angstroms to pixels in the original image frame
+  shift = shift * array_image_shape / new_scale
+
+  # Start the slice at the beginning of the real image (after padding).
+  slice_start = shift + array_padding_shape
+
+  # We don't want to have a negative slice start, or a slice start that would
+  # go out-of-bounds, so we clip the slice starts accordingly.
+  # If a slice gets clipped, it should produce an entirely-padded image.
+  slice_start[0] = np.clip(
+      slice_start[0], 0, padded_image.shape[0] - output_shape[0]
+  )
+  slice_start[1] = np.clip(
+      slice_start[1], 0, padded_image.shape[1] - output_shape[1]
+  )
+
+  slice_start = np.round(slice_start).astype(np.int32) + np.array([0, 0])
+  sliced_image = padded_image[
+      slice_start[0] : slice_start[0] + output_shape[0],
+      slice_start[1] : slice_start[1] + output_shape[1],
+  ]
+
+  return sliced_image
+
+
+class ImageAligner:
+  """A wrapper that applies a pretrained image alignment model.
+
+  Attributes:
+    image_history: Deque of previous images. Created when reset is called.
+    fov_history: Deque of previous FOVs. Created when reset is called.
+    model_path: Path to saved model weights.
+    hybrid: Whether to use a grid-based aligner as a postprocessing step.
+    postprocessing_aligner: The postprocessing aligner (if in use).
+    adaptive_normalization: Whether to use equalize_adaptist to smartly
+      renormalize images prior to network application.
+    model: The loaded model.
+    history_length: Length of sequences to process. Int.
+    needs_reset: Whether the model will be reset at its next application.
+  """
+
+  # TensorFlow saved model path
+  model_path: epath.Path
+
+  image_history: Deque[np.ndarray]
+  fov_history: Deque[microscope_utils.MicroscopeFieldOfView]
+
+  model: Any
+
+  adaptive_normalization: bool = True
+
+  hybrid: bool = False
+  postprocessing_aligner: Optional['IterativeAlignmentFiltering'] = None
+
+  needs_reset: bool = True
+
+  history_length: int = 5
+
+  def reset(
+      self, history_length: int = 5, example_image=np.zeros((512, 512, 1))
+  ):
+    """Resets the internal history of the aligner.
+
+    Args:
+      history_length: The history length in use.
+      example_image: An image to pad the history with.
+    """
+    self.image_history = collections.deque(maxlen=history_length - 1)
+    self.fov_history = collections.deque(maxlen=history_length - 1)
+
+    dummy_image = np.zeros_like(example_image)
+    for _ in range(history_length):
+      self.image_history.append(dummy_image)
+      self.fov_history.append(
+          microscope_utils.MicroscopeFieldOfView(
+              geometry.Point(0, 0), geometry.Point(20, 20)
+          )
+      )
+
+    if self.hybrid:
+      self.postprocessing_aligner.reset()
+
+    self.needs_reset = False
+
+  def __init__(self, model_path: epath.Path, hybrid: bool = False):
+    self.model_path = model_path
+    self.hybrid = hybrid
+
+    if self.hybrid:
+      self.postprocessing_aligner = IterativeAlignmentFiltering(
+          history_length=1,
+          alignment_iterations=1,
+          noise_scale=0.0,
+          max_shift=constants.CARBON_BOND_DISTANCE_ANGSTROMS / 2,
+          merge_cutoff=constants.CARBON_BOND_DISTANCE_ANGSTROMS / 2,
+          accumulate_merged=False,
+          clique_merging=True,
+          trim=0.5,
+      )
+
+  @functools.cached_property
+  def model(self) -> Any:
+    return tf.saved_model.load(self.model_path)
+
+  @classmethod
+  def compute_centroids(cls, classes, class_index, erode_iters=1):
+    """Finds centroids in an image based on class predictions.
+
+    Args:
+      classes: One-hot class predictions (from argmax or thresholding).
+      class_index: The index of the class to select centroids for.
+      erode_iters: How much erosion to do (to eliminate small blobs).
+
+    Returns:
+      List of centroids representing detected atoms.
+    """
+    mask = classes.copy()
+    mask[classes != class_index] = 0
+    mask = (mask * 255).astype(np.uint8)
+    if erode_iters:
+      mask = cv2.erode(mask, np.ones((2, 2)), iterations=erode_iters)
+    _, contours, _ = cv2.findContours(
+        mask, cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE
+    )
+
+    centroids = []
+    for contour in contours:
+      # calculate moments for each contour
+      m = cv2.moments(contour)
+
+      if m['m00'] != 0:
+        c_x = int(m['m10'] / m['m00'])
+        c_y = int(m['m01'] / m['m00'])
+      else:
+        c_x, c_y = 0, 0
+
+      # Normalize so that 0,0 is bottom left and 1,1 is top right
+      centroids.append((c_x / classes.shape[0], 1.0 - c_y / classes.shape[1]))
+    return centroids
+
+  @classmethod
+  def process_detection_predictions(
+      cls,
+      probs: np.ndarray,
+      buffer_width: float = 0.05,
+  ) -> microscope_utils.AtomicGridMicroscopeFrame:
+    """Processes predicted atom classes to produce an AtomicGrid.
+
+    Args:
+      probs: Predicted per-pixel probabilities of each atom class.
+      buffer_width: Size of buffer around image edges to ignore when performing
+        atom detection (float, in image fractions). 0.5 ignores entire image.
+
+    Returns:
+      An AtomicGrid containing the extracted atoms.
+    """
+    classes = np.argmax(probs, axis=-1)
+    carbon_centroids = ImageAligner.compute_centroids(
+        classes,
+        1,
+        erode_iters=1,
+    )
+    silicon_centroids = ImageAligner.compute_centroids(
+        classes, 2, erode_iters=3
+    )
+    carbon_centroids = np.array(carbon_centroids)
+    silicon_centroids = np.array(silicon_centroids)
+    if not silicon_centroids.size:
+      silicon_centroids = np.zeros((0, 2))
+    if not carbon_centroids.size:
+      carbon_centroids = np.zeros((0, 2))
+
+    # Construct an array of atomic numbers for both atoms
+    carbon_atomic_numbers = np.array([constants.CARBON] * len(carbon_centroids))
+    silicon_atomic_numbers = np.array(
+        [constants.SILICON] * len(silicon_centroids)
+    )
+
+    atom_positions = np.concatenate([carbon_centroids, silicon_centroids])
+    atomic_numbers = np.concatenate(
+        [carbon_atomic_numbers, silicon_atomic_numbers]
+    ).astype(np.int32)
+
+    in_bounds = (atom_positions > buffer_width).all(-1) & (
+        atom_positions < (1 - buffer_width)
+    ).all(-1)
+
+    atom_positions = atom_positions[in_bounds]
+    atomic_numbers = atomic_numbers[in_bounds]
+
+    grid = microscope_utils.AtomicGrid(
+        atom_positions=atom_positions, atomic_numbers=atomic_numbers
+    )
+    return microscope_utils.AtomicGridMicroscopeFrame(grid)
+
+  @classmethod
+  def from_url(
+      cls,
+      url: str = 'https://storage.googleapis.com/spr_data_bucket_public/alignment/20230403-image-aligner.zip',
+      workdir: Optional[str] = None,
+      reload: bool = False,
+      **kwargs,
+  ) -> 'ImageAligner':
+    """Construct model from URL.
+
+    Args:
+      url: Model URL, expected to be a zip file.
+      workdir: Optional, locatioon (e.g., temp dir) to extract weights to.
+      reload: Optional, whether to force-redownload aligner.
+      **kwargs: Optional arguments for the ImageAligner.
+
+    Returns:
+      ImageAligner instance.
+    """
+    # Model save path on disk
+    if workdir is None:
+      workdir = epath.resource_path('putting_dune')
+    model_path = epath.Path(workdir) / 'model_weights' / 'image-alignment-model'
+    if not model_path.exists() or reload:
+      model_path.mkdir(parents=True, exist_ok=True)
+      with urllib.request.urlopen(url) as request:
+        with zipfile.ZipFile(io.BytesIO(request.read())) as model_zip:
+          model_zip.extractall(model_path.parent)
+
+    return ImageAligner(model_path=model_path, **kwargs)
+
+  def __call__(
+      self,
+      image: np.ndarray,
+      fov: microscope_utils.MicroscopeFieldOfView,
+      grid: Optional[microscope_utils.AtomicGridMicroscopeFrame] = None,
+      time_index: int = -1,
+  ) -> Tuple[
+      microscope_utils.AtomicGridMicroscopeFrame, Any, Any,
+  ]:
+    """Performs alignment and atom detection on an observation.
+
+    Args:
+      image: New image observation. Does not need to be normalized.
+      fov: FOV describing the (estimated) bounds of this image on the material.
+      grid: Optionally, a grid describing the atoms in the image, to replace the
+        grid estimated by this class.
+      time_index: Which time index to predict for. Set values other than -1 to
+        perform smoothing.
+
+    Returns:
+      The AtomicGrid estimated by the detection, the estimated drift, and a
+      label mask of the image.
+    """
+    # Perform pre-processing on the image.
+    # This involves:
+    #   1. Downsampling the image to 512 x 512
+    #   2. Optionally performing adaptive equalization.
+    #   3. Normalizing the image to be [0, 1]
+    if image.ndim == 2:
+      image = np.expand_dims(image, -1)
+
+    image = image.astype(np.float32)
+
+    if self.adaptive_normalization:
+      image = exposure.equalize_adapthist(image)
+
+    image: tf.Tensor = tf.image.resize(
+        image,
+        (512, 512),
+        method='nearest',
+    )
+    image_min, image_max = tf.reduce_min(image), tf.reduce_max(image)
+    image = (image - image_min) / (image_max - image_min)
+    if self.needs_reset:
+      self.reset(history_length=self.history_length, example_image=image)
+
+    padded_images = [
+        pad_and_crop_images_by_fov(old_image, old_fov, fov)
+        for old_image, old_fov in zip(self.image_history, self.fov_history)
+    ]
+    padded_images.append(image)
+
+    framestack = np.concatenate(padded_images, -1)
+
+    # Feed image through the detection model to get the logits
+    model_outputs = self.model.signatures['serving_default'](
+        image=framestack,
+    )
+    logits = model_outputs['output_0']
+    pred_drift = model_outputs['output_1'].numpy()
+    pred_drift = np.reshape(pred_drift, (*pred_drift.shape[:-1], -1, 2))
+    pred_drift = pred_drift[..., time_index, :]
+    logits = tf.reshape(logits, (*logits.shape[:-1], -1, 3))
+    logits = logits[..., time_index, :]
+    probs = tf.nn.softmax(logits).numpy()
+    if grid is None:
+      grid = ImageAligner.process_detection_predictions(probs)
+
+    self.image_history.append(image)
+    self.fov_history.append(fov)
+
+    if self.hybrid:
+      try:
+        shifted_fov = fov.shift(geometry.Point(*-pred_drift))
+        material_grid = shifted_fov.microscope_frame_to_material_frame(grid)
+        postprocessed_grid, postprocessed_drift = self.postprocessing_aligner(
+            material_grid
+        )
+        pred_drift = pred_drift + postprocessed_drift
+        shifted_fov = fov.shift(geometry.Point(*-pred_drift))
+        grid = shifted_fov.material_frame_to_microscope_frame(
+            postprocessed_grid
+        )
+      except Exception as e:  # pylint: disable=broad-except
+        print('Postprocessing failed; {}'.format(str(e)))
+        self.postprocessing_aligner.reset()
+
+    return grid, pred_drift, probs
+
+
 class IterativeAlignmentFiltering:
   """Class that keeps a list of recent states and aligns new states to them.
 
@@ -208,6 +600,8 @@ class IterativeAlignmentFiltering:
     classifier: SKLearn classifier to use when determining carbon classes.
     shift_momentum: The current moving average shift.
     step: How many steps have been carried out in the current trajectory.
+    trim: Trim fraction to use in the mean for estimating shifts. 0.25 yields
+      IQM, 0 yields standard mean, 0.5 yields median.
   """
 
   def __init__(
@@ -219,6 +613,7 @@ class IterativeAlignmentFiltering:
       merge_cutoff: float = 1.1,
       accumulate_merged: bool = False,
       clique_merging: bool = False,
+      trim: float = 0,
   ):
     self.history_length = history_length
     self.alignment_iterations = alignment_iterations
@@ -227,6 +622,7 @@ class IterativeAlignmentFiltering:
     self.merge_cutoff = merge_cutoff
     self.accumulate_merged = accumulate_merged
     self.clique_merging = clique_merging
+    self.trim = trim
 
     self.reset()
 
@@ -239,8 +635,8 @@ class IterativeAlignmentFiltering:
   def apply_shift(self, shift: np.ndarray) -> None:
     """Applies a vector shift to the aligner's state.
 
-    The shift is assumed to be of the form (new + shift ~= old), so we convert
-    this to (new ~= old - shift) to allow past shifts to be accumulated.
+    The shift is assumed to be of the form (old + shift ~= new), so we convert
+    this to (new ~= old + shift) to allow past shifts to be accumulated.
 
     Args:
       shift: (2,) ndarray containing the shift in each direction.
@@ -248,12 +644,12 @@ class IterativeAlignmentFiltering:
     Returns:
       None.
     """
-    self.recent_observations = [obs - shift for obs in self.recent_observations]
+    self.recent_observations = [obs + shift for obs in self.recent_observations]
 
-  def align(
+  def __call__(
       self,
-      new_observation: microscope_utils.AtomicGrid,
-  ) -> tuple[microscope_utils.AtomicGrid, np.ndarray]:
+      new_observation: microscope_utils.AtomicGridMaterialFrame,
+  ) -> tuple[microscope_utils.AtomicGridMaterialFrame, np.ndarray]:
     """Takes a new observation and reconciles it with the aligner's state.
 
     If no state exists, initializes it to the new observation and returns.
@@ -277,16 +673,15 @@ class IterativeAlignmentFiltering:
               new_observation.atom_positions, self.classifier
           )
       )
-
-      merged_observation = new_observation
-      offset = np.zeros((2,))
+      merged_grid = new_observation
+      drift = np.zeros((2,))
 
     else:
       classes = classify_lattice_types(
           new_observation.atom_positions, self.classifier
       )
 
-      offset = align_latest(
+      drift = align_latest(
           new_observation.atom_positions,
           np.concatenate(self.recent_observations),
           classes,
@@ -295,9 +690,11 @@ class IterativeAlignmentFiltering:
           noise_scale=self.noise_scale,
           max_shift=self.max_shift,
           mask_above=2.0,
+          init_shift=np.zeros((2,)),
+          trim=self.trim,
       )
 
-      new_observation = new_observation.shift(offset)
+      new_observation = new_observation.shift(drift)
 
       to_merge = list(self.recent_observations) + [
           new_observation.atom_positions
@@ -327,10 +724,11 @@ class IterativeAlignmentFiltering:
           joined_coords,
           new_observation.atomic_numbers,
       )
-      merged_observation = microscope_utils.AtomicGrid(
+      merged_grid = microscope_utils.AtomicGrid(
           joined_coords, aligned_atomic_numbers
       )
-    return merged_observation, offset
+      merged_grid = microscope_utils.AtomicGridMaterialFrame(merged_grid)
+    return merged_grid, -drift
 
 
 def propagate_atomic_numbers(
@@ -385,7 +783,7 @@ def propagate_atomic_numbers(
 
 
 def naive_merge(
-    coordinates: np.ndarray, cutoff: float = 0.7
+    coordinates: Sequence[np.ndarray], cutoff: float = 0.7
 ) -> tuple[np.ndarray, np.ndarray]:
   """Merges lists of coordinates based on simple proximity.
 
