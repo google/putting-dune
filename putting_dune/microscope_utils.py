@@ -151,26 +151,32 @@ class MicroscopeFieldOfView:
   contains convenience functions for moving between these coordinate spaces.
   """
 
-  lower_left: geometry.Point
-  upper_right: geometry.Point
+  lower_left: geometry.PointMaterialFrame
+  upper_right: geometry.PointMaterialFrame
 
-  def shift(self, shift: geometry.Point) -> 'MicroscopeFieldOfView':
-    new_lower_left = geometry.Point(
-        self.lower_left.x + shift.x, self.lower_left.y + shift.y
+  def shift(
+      self, shift: geometry.PointMaterialFrame
+  ) -> 'MicroscopeFieldOfView':
+    new_lower_left = geometry.PointMaterialFrame(
+        geometry.Point(self.lower_left.x + shift.x, self.lower_left.y + shift.y)
     )
-    new_upper_right = geometry.Point(
-        self.upper_right.x + shift.x, self.upper_right.y + shift.y
+    new_upper_right = geometry.PointMaterialFrame(
+        geometry.Point(
+            self.upper_right.x + shift.x, self.upper_right.y + shift.y
+        )
     )
     return MicroscopeFieldOfView(new_lower_left, new_upper_right)
 
   @property
-  def offset(self) -> geometry.Point:
-    return geometry.Point(
-        (
-            np.asarray(self.lower_left.coords).reshape(-1)
-            + np.asarray(self.upper_right.coords).reshape(-1)
+  def offset(self) -> geometry.PointMaterialFrame:
+    return geometry.PointMaterialFrame(
+        geometry.Point(
+            (
+                np.asarray(self.lower_left.coords).reshape(-1)
+                + np.asarray(self.upper_right.coords).reshape(-1)
+            )
+            / 2
         )
-        / 2
     )
 
   @property
@@ -202,8 +208,12 @@ class MicroscopeFieldOfView:
     ) / 2
     new_lower_left = centerpoint - new_scale_vector
     new_upper_right = centerpoint + new_scale_vector
-    new_lower_left = geometry.Point(new_lower_left[0], new_lower_left[1])
-    new_upper_right = geometry.Point(new_upper_right[0], new_upper_right[1])
+    new_lower_left = geometry.PointMaterialFrame(
+        geometry.Point(new_lower_left[0], new_lower_left[1])
+    )
+    new_upper_right = geometry.PointMaterialFrame(
+        geometry.Point(new_upper_right[0], new_upper_right[1])
+    )
     return MicroscopeFieldOfView(new_lower_left, new_upper_right)
 
   def zoom(self, zoom_factor: float) -> 'MicroscopeFieldOfView':
@@ -224,8 +234,8 @@ class MicroscopeFieldOfView:
 
   @typing.overload
   def microscope_frame_to_material_frame(
-      self, point: geometry.Point
-  ) -> geometry.Point:
+      self, point: geometry.PointMicroscopeFrame
+  ) -> geometry.PointMaterialFrame:
     ...
 
   @typing.overload
@@ -254,10 +264,12 @@ class MicroscopeFieldOfView:
       return (point.reshape(-1, 2) * scale + lower_left).reshape(return_shape)
     elif isinstance(point, geometry.Point):
       point = typing.cast(geometry.Point, point)
-      return geometry.Point((
-          point.x * scale[0, 0] + lower_left[0, 0],
-          point.y * scale[0, 1] + lower_left[0, 1],
-      ))
+      return geometry.PointMaterialFrame(
+          geometry.Point((
+              point.x * scale[0, 0] + lower_left[0, 0],
+              point.y * scale[0, 1] + lower_left[0, 1],
+          ))
+      )
     elif isinstance(point, BeamControl):
       position = geometry.Point((
           point.position.x * scale[0, 0] + lower_left[0, 0],
@@ -275,7 +287,7 @@ class MicroscopeFieldOfView:
 
   @typing.overload
   def material_frame_to_microscope_frame(
-      self, point: geometry.Point
+      self, point: geometry.PointMaterialFrame
   ) -> geometry.Point:
     ...
 
@@ -311,10 +323,12 @@ class MicroscopeFieldOfView:
       return ((point.reshape(-1, 2) - lower_left) / scale).reshape(return_shape)
     elif isinstance(point, geometry.Point):
       point = typing.cast(geometry.Point, point)
-      return geometry.Point((
-          (point.x - lower_left[0, 0]) / scale[0, 0],
-          (point.y - lower_left[0, 1]) / scale[0, 1],
-      ))
+      return geometry.PointMicroscopeFrame(
+          geometry.Point((
+              (point.x - lower_left[0, 0]) / scale[0, 0],
+              (point.y - lower_left[0, 1]) / scale[0, 1],
+          ))
+      )
     elif isinstance(point, BeamControl):
       position = geometry.Point((
           (point.position.x - lower_left[0, 0]) / scale[0, 0],
@@ -374,8 +388,12 @@ class MicroscopeFieldOfView:
       fov: putting_dune_pb2.FieldOfView,
   ) -> 'MicroscopeFieldOfView':
     return cls(
-        lower_left=proto_point_to_shapely_point(fov.lower_left_angstroms),
-        upper_right=proto_point_to_shapely_point(fov.upper_right_angstroms),
+        lower_left=geometry.PointMaterialFrame(
+            proto_point_to_shapely_point(fov.lower_left_angstroms)
+        ),
+        upper_right=geometry.PointMaterialFrame(
+            proto_point_to_shapely_point(fov.upper_right_angstroms)
+        ),
     )
 
   def to_proto(self) -> putting_dune_pb2.FieldOfView:
@@ -661,7 +679,9 @@ class Drift:
     shifted_grid = AtomicGrid(
         dejittered_atom_positions, observation.grid.atomic_numbers
     )
-    point_drift = geometry.Point(self.drift[0], self.drift[1])
+    point_drift = geometry.PointMaterialFrame(
+        geometry.Point(self.drift[0], self.drift[1])
+    )
     shifted_fov = observation.fov.shift(point_drift)
     shifted_observation = MicroscopeObservation(
         grid=AtomicGridMicroscopeFrame(shifted_grid),
@@ -696,9 +716,7 @@ class Drift:
         putting_dune_pb2.Point2D(x=self.jitter[i, 0], y=self.jitter[i, 1])
         for i in range(num_atoms)
     ]
-    proto_drift = putting_dune_pb2.Point2D(
-        x=self.drift[0], y=self.drift[1]
-    )
+    proto_drift = putting_dune_pb2.Point2D(x=self.drift[0], y=self.drift[1])
     drift = putting_dune_pb2.Drift(jitter=proto_jitter, drift=proto_drift)
     return drift
 

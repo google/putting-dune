@@ -158,7 +158,8 @@ def convert_dataset_to_proto(
         microscope_utils.AtomicGrid(grid, atomic_numbers)
     )
     fov = microscope_utils.MicroscopeFieldOfView(
-        geometry.Point(corners[0]), geometry.Point(corners[1])
+        geometry.PointMaterialFrame(geometry.Point(corners[0])),
+        geometry.PointMaterialFrame(geometry.Point(corners[1])),
     )
 
     if np.isnan(parameters[str(t)]['beam dwelltime']):
@@ -166,7 +167,9 @@ def convert_dataset_to_proto(
       elapsed_time = dt.timedelta(seconds=2.0)
     else:
       beam_loc = coordinate_dict[str(t)]['beam loc'][0] / rescale_factor
-      beam_loc = geometry.Point(beam_loc[0], beam_loc[1])
+      beam_loc = geometry.PointMicroscopeFrame(
+          geometry.Point(beam_loc[0], beam_loc[1])
+      )
       beam_loc = fov.microscope_frame_to_material_frame(beam_loc)
       beam_control = (
           microscope_utils.BeamControl(

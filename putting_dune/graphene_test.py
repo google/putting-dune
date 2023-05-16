@@ -24,7 +24,6 @@ from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
 from putting_dune import test_utils
-from sklearn import neighbors
 
 _ARBITRARY_CONTROL = microscope_utils.BeamControlMaterialFrame(
     microscope_utils.BeamControl(
@@ -48,15 +47,9 @@ class GrapheneTest(absltest.TestCase):
     middle_position = positions[middle_idx]
 
     # Get the neighbors of that position.
-    neighbor_distances, _ = (
-        neighbors.NearestNeighbors(
-            n_neighbors=1 + 3,
-            metric='l2',
-            algorithm='brute',
-        )
-        .fit(positions)
-        .kneighbors(middle_position.reshape(1, 2))
-    )
+    neighbor_distances = geometry.nearest_neighbors3(
+        positions, middle_position, include_self=True
+    ).neighbor_distances
     neighbor_distances = neighbor_distances.reshape(-1)
 
     self.assertEqual(neighbor_distances[0], 0.0)  # Self-distance.
@@ -74,12 +67,12 @@ class GrapheneTest(absltest.TestCase):
     material = graphene.PristineSingleDopedGraphene()
     material.reset(self.rng)
 
-    num_atoms = material.atom_positions.shape[0]
+    num_atoms = material.grid.atom_positions.shape[0]
     chosen_idx = self.rng.choice(num_atoms)
-    chosen_atom_position = material.atom_positions[chosen_idx].reshape(1, 2)
-    neighbor_distances, _ = material.nearest_neighbors.kneighbors(
-        chosen_atom_position
-    )
+    chosen_atom_position = material.grid.atom_positions[chosen_idx]
+    neighbor_distances = geometry.nearest_neighbors3(
+        material.grid.atom_positions, chosen_atom_position, include_self=True
+    ).neighbor_distances
     neighbor_distances = neighbor_distances.reshape(-1)
 
     self.assertEqual(neighbor_distances[0], 0.0)  # Self-distance.
@@ -102,26 +95,30 @@ class GrapheneTest(absltest.TestCase):
     material2.reset(rng2)
 
     # Pick an atom at random from both sheets.
-    num_atoms1 = material1.atom_positions.shape[0]
-    num_atoms2 = material2.atom_positions.shape[0]
+    num_atoms1 = material1.grid.atom_positions.shape[0]
+    num_atoms2 = material2.grid.atom_positions.shape[0]
     chosen_idx1 = self.rng.choice(num_atoms1)
     chosen_idx2 = self.rng.choice(num_atoms2)
-    chosen_atom_position1 = material1.atom_positions[chosen_idx1].reshape(1, 2)
-    chosen_atom_position2 = material2.atom_positions[chosen_idx2].reshape(1, 2)
+    chosen_atom_position1 = material1.grid.atom_positions[chosen_idx1].reshape(
+        1, 2
+    )
+    chosen_atom_position2 = material2.grid.atom_positions[chosen_idx2].reshape(
+        1, 2
+    )
 
     # Get the nearest neighbors for both atoms.
-    _, nearest_neighbors1 = material1.nearest_neighbors.kneighbors(
-        chosen_atom_position1
-    )
-    _, nearest_neighbors2 = material1.nearest_neighbors.kneighbors(
-        chosen_atom_position1
-    )
+    nearest_neighbors1 = geometry.nearest_neighbors3(
+        material1.grid.atom_positions, chosen_atom_position1
+    ).neighbor_indices
+    nearest_neighbors2 = geometry.nearest_neighbors3(
+        material2.grid.atom_positions, chosen_atom_position2
+    ).neighbor_indices
 
     # Remove the self atom in the nearest neighbors.
     nearest_neighbors1 = nearest_neighbors1.reshape(-1)
     nearest_neighbors2 = nearest_neighbors2.reshape(-1)
-    nearest_neighbors1 = material1.atom_positions[nearest_neighbors1][1:]
-    nearest_neighbors2 = material2.atom_positions[nearest_neighbors2][1:]
+    nearest_neighbors1 = material1.grid.atom_positions[nearest_neighbors1]
+    nearest_neighbors2 = material2.grid.atom_positions[nearest_neighbors2]
 
     # Get the angle to the nearest neighbor that is closest to directly up.
     up_vector = np.asarray([0.0, 1.0])
@@ -143,18 +140,20 @@ class GrapheneTest(absltest.TestCase):
     material = graphene.PristineSingleDopedGraphene()
     material.reset(self.rng)
 
-    num_silicon = np.sum(material.atomic_numbers == constants.SILICON)
+    num_silicon = np.sum(material.grid.atomic_numbers == constants.SILICON)
     self.assertEqual(num_silicon, 1)
 
   def test_get_atoms_in_bounds_gets_correct_atoms(self):
     material = graphene.PristineSingleDopedGraphene()
     material.reset(self.rng)
 
-    lower_left = geometry.Point((0.0, 0.0))
-    upper_right = geometry.Point((
-        2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
-        2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
-    ))
+    lower_left = geometry.PointMaterialFrame(geometry.Point((0.0, 0.0)))
+    upper_right = geometry.PointMaterialFrame(
+        geometry.Point((
+            2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+            2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ))
+    )
     grid = material.get_atoms_in_bounds(lower_left, upper_right)
 
     # We are getting a 2 unit cell by 2 unit cell distance.
@@ -178,11 +177,13 @@ class GrapheneTest(absltest.TestCase):
     material = graphene.PristineSingleDopedGraphene()
     material.reset(self.rng)
 
-    lower_left = geometry.Point((-10.0, -10.0))
-    upper_right = geometry.Point((
-        -10.0 + 5 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
-        -10.0 + 5 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
-    ))
+    lower_left = geometry.PointMaterialFrame(geometry.Point((-10.0, -10.0)))
+    upper_right = geometry.PointMaterialFrame(
+        geometry.Point((
+            -10.0 + 5 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+            -10.0 + 5 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ))
+    )
     grid = material.get_atoms_in_bounds(lower_left, upper_right)
 
     self.assertTrue((grid.atom_positions >= 0.0).all())
@@ -190,32 +191,36 @@ class GrapheneTest(absltest.TestCase):
 
   @mock.patch.object(
       graphene,
-      'simple_transition_rates',
+      'simple_canonical_rate_function',
       autospec=True,
       # About 15 events should occur per second on average.
       return_value=np.full((3,), 5.0, dtype=np.float32),
   )
   def test_graphene_transitions_without_affecting_structure(self, mock_rate_fn):
-    material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
+    material = graphene.PristineSingleDopedGraphene(
+        rate_function=graphene.PristineSingleSiGrRatePredictor(
+            canonical_rate_prediction_fn=mock_rate_fn,
+        )
+    )
     material.reset(self.rng)
 
-    atom_positions_before = np.copy(material.atom_positions)
-    atomic_numbers_before = np.copy(material.atomic_numbers)
+    atom_positions_before = np.copy(material.grid.atom_positions)
+    atomic_numbers_before = np.copy(material.grid.atomic_numbers)
 
     material.apply_control(self.rng, _ARBITRARY_CONTROL)
-    atom_positions_after = np.copy(material.atom_positions)
-    atomic_numbers_after = np.copy(material.atomic_numbers)
+    atom_positions_after = np.copy(material.grid.atom_positions)
+    atomic_numbers_after = np.copy(material.grid.atomic_numbers)
 
     # Check the structure hasn't changed, but the silicon has moved.
     np.testing.assert_array_equal(atom_positions_before, atom_positions_after)
     self.assertTrue((atomic_numbers_before != atomic_numbers_after).any())
 
-    num_silicon = np.sum(material.atomic_numbers == constants.SILICON)
+    num_silicon = np.sum(material.grid.atomic_numbers == constants.SILICON)
     self.assertEqual(num_silicon, 1)
 
   @mock.patch.object(
       graphene,
-      'simple_transition_rates',
+      'simple_canonical_rate_function',
       autospec=True,
       # About 15 events should occur per second on average.
       return_value=np.full((3,), 5.0, dtype=np.float32),
@@ -223,7 +228,11 @@ class GrapheneTest(absltest.TestCase):
   def test_simulator_allows_multiple_transitions_when_rates_are_high(
       self, mock_rate_fn
   ):
-    material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
+    material = graphene.PristineSingleDopedGraphene(
+        rate_function=graphene.PristineSingleSiGrRatePredictor(
+            canonical_rate_prediction_fn=mock_rate_fn,
+        )
+    )
     material.reset(self.rng)
     material.apply_control(self.rng, _ARBITRARY_CONTROL)
 
@@ -234,19 +243,31 @@ class GrapheneTest(absltest.TestCase):
     high_rate_transitioned_more_than_low_rate = []
     for _ in range(num_trials):
       # Get the number of transitions with a high rate.
-      with mock.patch.object(graphene, 'simple_transition_rates') as rate_fn:
+      with mock.patch.object(
+          graphene, 'simple_canonical_rate_function'
+      ) as rate_fn:
         # About 0.3 events should occur per second on average.
         rate_fn.return_value = np.full((3,), 0.1, dtype=np.float32)
-        material = graphene.PristineSingleDopedGraphene(predict_rates=rate_fn)
+        material = graphene.PristineSingleDopedGraphene(
+            rate_function=graphene.PristineSingleSiGrRatePredictor(
+                canonical_rate_prediction_fn=rate_fn,
+            )
+        )
         material.reset(self.rng)
         material.apply_control(self.rng, _ARBITRARY_CONTROL)
         low_rate_transitions = rate_fn.call_count
 
       # Get the number of transitions with a low rate.
-      with mock.patch.object(graphene, 'simple_transition_rates') as rate_fn:
+      with mock.patch.object(
+          graphene, 'simple_canonical_rate_function'
+      ) as rate_fn:
         # About 6 events should occur per second on average.
         rate_fn.return_value = np.full((3,), 2.0, dtype=np.float32)
-        material = graphene.PristineSingleDopedGraphene(predict_rates=rate_fn)
+        material = graphene.PristineSingleDopedGraphene(
+            rate_function=graphene.PristineSingleSiGrRatePredictor(
+                canonical_rate_prediction_fn=rate_fn,
+            )
+        )
         material.reset(self.rng)
         material.apply_control(self.rng, _ARBITRARY_CONTROL)
         high_rate_transitions = rate_fn.call_count
@@ -269,9 +290,9 @@ class GrapheneTest(absltest.TestCase):
     for _ in range(100):
       material.reset(self.rng)
 
-      neighbor_distances, _ = material.nearest_neighbors.kneighbors(
-          material.get_silicon_position().reshape(1, 2)
-      )
+      neighbor_distances = geometry.nearest_neighbors3(
+          material.grid.atom_positions, material.get_silicon_position()
+      ).neighbor_distances
       self.assertLessEqual(
           neighbor_distances[0, -1],
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
@@ -280,7 +301,9 @@ class GrapheneTest(absltest.TestCase):
   def test_human_prior_rates(self):
     transition_model = graphene.HumanPriorRatePredictor()
     material = graphene.PristineSingleDopedGraphene(
-        predict_rates=transition_model.predict
+        rate_function=graphene.PristineSingleSiGrRatePredictor(
+            canonical_rate_prediction_fn=transition_model.predict,
+        )
     )
     material.reset(self.rng)
 
@@ -292,7 +315,7 @@ class PristineSingleSiGrRatePredictorTest(absltest.TestCase):
   def test_predictor_returns_3_rates(self):
     rng = np.random.default_rng(0)
     predictor = graphene.PristineSingleSiGrRatePredictor(
-        graphene.simple_transition_rates
+        graphene.simple_canonical_rate_function
     )
     grid = test_utils.create_single_silicon_pristine_sigr(rng)
 
@@ -304,7 +327,7 @@ class PristineSingleSiGrRatePredictorTest(absltest.TestCase):
 
     predicted_rates = predictor(grid, control_position)
 
-    self.assertLen(predicted_rates, 3)
+    self.assertLen(predicted_rates.successor_states, 3)
 
 
 if __name__ == '__main__':

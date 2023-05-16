@@ -200,7 +200,9 @@ def _get_direct_goal_reaching_from_pixels() -> experiments.AdaptersAndGoal:
 def _get_simple_rates_config() -> experiments.SimulatorConfig:
   return experiments.SimulatorConfig(
       material=graphene.PristineSingleDopedGraphene(
-          predict_rates=graphene.simple_transition_rates
+          rate_function=graphene.PristineSingleSiGrRatePredictor(
+              canonical_rate_prediction_fn=graphene.simple_canonical_rate_function,
+          ),
       ),
       image_duration=dt.timedelta(seconds=2.0),
   )
@@ -209,7 +211,9 @@ def _get_simple_rates_config() -> experiments.SimulatorConfig:
 def _get_human_prior_rates_config() -> experiments.SimulatorConfig:
   return experiments.SimulatorConfig(
       material=graphene.PristineSingleDopedGraphene(
-          predict_rates=graphene.HumanPriorRatePredictor().predict
+          rate_function=graphene.PristineSingleSiGrRatePredictor(
+              canonical_rate_prediction_fn=graphene.HumanPriorRatePredictor().predict,
+          ),
       ),
       image_duration=dt.timedelta(seconds=2.0),
   )

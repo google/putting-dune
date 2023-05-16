@@ -31,7 +31,7 @@ class AlignmentUtilsTest(absltest.TestCase):
     self.material.reset(self.rng)
 
   def test_atom_classifer(self):
-    coordinates = self.material.atom_positions
+    coordinates = self.material.grid.atom_positions
     classifier = alignment.get_lattice_clusterer(coordinates)
 
     classes = alignment.classify_lattice_types(coordinates, classifier)
@@ -45,7 +45,7 @@ class AlignmentUtilsTest(absltest.TestCase):
     np.testing.assert_allclose(classes, 1 - neighbor_classes, rtol=1e-6)
 
   def test_offset_calculation(self):
-    coordinates = self.material.atom_positions
+    coordinates = self.material.grid.atom_positions
     shift = np.array((0.5, 0.5))
     shifted_coordinates = coordinates + shift
     offset = alignment.get_offsets(coordinates, shifted_coordinates)
@@ -83,7 +83,7 @@ class GrapheneScaleTest(parameterized.TestCase):
   def test_scale_estimation(self, scale, grid_columns):
     material = graphene.PristineSingleDopedGraphene(grid_columns=grid_columns)
     material.reset(self.rng)
-    coordinates = material.atom_positions
+    coordinates = material.grid.atom_positions
 
     est_scale = alignment.get_graphene_scale_factor(coordinates * scale)
 
@@ -132,10 +132,7 @@ class IteratedAlignmentTest(parameterized.TestCase):
         clique_merging=clique_merging,
     )
 
-    observation = microscope_utils.AtomicGrid(
-        material.atom_positions, material.atomic_numbers
-    )
-    observation = microscope_utils.AtomicGridMaterialFrame(observation)
+    observation = material.grid
 
     drift = np.array([0.1, 0.1])
     shifts = np.stack([drift] * 10, 0).cumsum(0)

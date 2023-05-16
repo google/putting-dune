@@ -19,6 +19,7 @@ from absl.testing import parameterized
 import numpy as np
 from putting_dune import action_adapters
 from putting_dune import constants
+from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
 from putting_dune import test_utils
@@ -220,12 +221,12 @@ class ActionAdaptersTest(parameterized.TestCase):
     )
     unit_control_pos_material_frame = (
         observation.fov.microscope_frame_to_material_frame(
-            unit_control[0].position
+            geometry.PointMicroscopeFrame(unit_control[0].position)
         )
     )
     long_control_pos_material_frame = (
         observation.fov.microscope_frame_to_material_frame(
-            long_control[0].position
+            geometry.PointMicroscopeFrame(long_control[0].position)
         )
     )
 

@@ -57,8 +57,12 @@ class ImagingTest(absltest.TestCase):
     silicon_position = material.get_silicon_position()
 
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point(silicon_position - 10.0),
-        upper_right=geometry.Point(silicon_position + 10.0),
+        lower_left=geometry.PointMaterialFrame(
+            geometry.Point(silicon_position - 10.0)
+        ),
+        upper_right=geometry.PointMaterialFrame(
+            geometry.Point(silicon_position + 10.0)
+        ),
     )
     grid = material.get_atoms_in_bounds(
         fov.lower_left,
@@ -82,8 +86,12 @@ class ImagingTest(absltest.TestCase):
     silicon_position = material.get_silicon_position()
 
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point(silicon_position - 10.0),
-        upper_right=geometry.Point(silicon_position + 10.0),
+        lower_left=geometry.PointMaterialFrame(
+            geometry.Point(silicon_position - 10.0)
+        ),
+        upper_right=geometry.PointMaterialFrame(
+            geometry.Point(silicon_position + 10.0)
+        ),
     )
     grid = material.get_atoms_in_bounds(
         fov.lower_left,

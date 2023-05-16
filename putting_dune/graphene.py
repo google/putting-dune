@@ -17,7 +17,7 @@
 import abc
 import dataclasses
 import datetime as dt
-from typing import Callable, List, Iterable, Sequence
+from typing import Iterable, Protocol, Sequence
 
 from absl import logging
 from jax.scipy import stats
@@ -25,7 +25,6 @@ import numpy as np
 from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import microscope_utils
-from sklearn import neighbors
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,13 +42,14 @@ class Rates:
     return sum([x.rate for x in self.successor_states])
 
 
-RateFunction = Callable[
-    [
-        microscope_utils.AtomicGridMaterialFrame,
-        geometry.PointMaterialFrame,
-    ],
-    Rates,
-]
+class RateFunction(Protocol):
+
+  def __call__(
+      self,
+      grid: microscope_utils.AtomicGridMaterialFrame,
+      beam_position: geometry.PointMaterialFrame,
+  ) -> Rates:
+    ...
 
 
 class SiliconNotFoundError(RuntimeError):
@@ -68,33 +68,33 @@ def single_silicon_prior_rates(
   return rate * norm
 
 
-def simple_transition_rates(
+def simple_canonical_rate_function(
     grid: microscope_utils.AtomicGridMaterialFrame,
-    beam_pos: geometry.Point,
-    current_position: np.ndarray,
+    beam_position: geometry.PointMaterialFrame,
+    silicon_position: np.ndarray,
     neighbor_indices: np.ndarray,
 ) -> np.ndarray:
   """Computes rate constants for transitioning a Si atom.
 
   Args:
     grid: Atomic grid state.
-    beam_pos: 2-dimensional beam position in [0, 1] coordinate frame.
-    current_position: 2-dimensional position of the current silicon atom.
+    beam_position: 2-dimensional beam position in [0, 1] coordinate frame.
+    silicon_position: 2-dimensional position of the current silicon atom.
     neighbor_indices: Indices of the atoms on the grid to calculate rates for.
 
   Returns:
     a 3-dimensional array of rate constants for transitioning to the 3
       nearest neighbors.
   """
-  # Convert the beam_pos into a numpy array for convenience
-  beam_pos = np.asarray([[beam_pos.x, beam_pos.y]])  # Shape = [1, -1]
+  # Convert the beam_position into a numpy array for convenience
+  beam_position = np.asarray([[beam_position.x, beam_position.y]])
 
   neighbor_positions = grid.atom_positions[neighbor_indices, :]
-  neighbor_positions = neighbor_positions - current_position
-  beam_pos = beam_pos - current_position
+  neighbor_positions = neighbor_positions - silicon_position
+  beam_position = beam_position - silicon_position
 
   # Distance between neighbors and beam position.
-  dist = np.linalg.norm(beam_pos - neighbor_positions, axis=-1)
+  dist = np.linalg.norm(beam_position - neighbor_positions, axis=-1)
   # Normalize by carbon bond distance.
   dist = dist / constants.CARBON_BOND_DISTANCE_ANGSTROMS
   # Inverse square falloff for beam displacement.
@@ -129,16 +129,16 @@ class HumanPriorRatePredictor:
   def predict(
       self,
       grid: microscope_utils.AtomicGridMaterialFrame,
-      beam_pos: geometry.Point,
-      current_position: np.ndarray,
+      beam_position: geometry.PointMaterialFrame,
+      silicon_position: np.ndarray,
       neighbor_indices: np.ndarray,
   ) -> np.ndarray:
     """Computes rate constants for transitioning a Si atom.
 
     Args:
       grid: Atomic grid state.
-      beam_pos: 2-dimensional beam position in material coordinate frame.
-      current_position: 2-dimensional position of the current silicon atom.
+      beam_position: 2-dimensional beam position in material coordinate frame.
+      silicon_position: 2-dimensional position of the current silicon atom.
       neighbor_indices: Indices of the atoms on the grid to calculate rates for.
 
     Returns:
@@ -146,13 +146,15 @@ class HumanPriorRatePredictor:
         nearest neighbors.
     """
     # Convert the beam_pos into a numpy array for convenience
-    beam_pos = np.asarray([[beam_pos.x, beam_pos.y]])  # Shape = [1, -1]
+    beam_position = np.asarray(
+        [[beam_position.x, beam_position.y]]
+    )  # Shape = [1, -1]
 
     neighbor_positions = grid.atom_positions[neighbor_indices, :]
-    relative_neighbor_positions = neighbor_positions - current_position
+    relative_neighbor_positions = neighbor_positions - silicon_position
     angles = geometry.get_angles(relative_neighbor_positions)
 
-    relative_beam_position = beam_pos - current_position
+    relative_beam_position = beam_position - silicon_position
     relative_beam_position /= constants.CARBON_BOND_DISTANCE_ANGSTROMS
     rates = np.zeros((neighbor_indices.shape), dtype=float)
     for i, angle in enumerate(angles):
@@ -171,7 +173,9 @@ class Material(abc.ABC):
 
   @abc.abstractmethod
   def get_atoms_in_bounds(
-      self, lower_left: geometry.Point, upper_right: geometry.Point
+      self,
+      lower_left: geometry.PointMaterialFrame,
+      upper_right: geometry.PointMaterialFrame,
   ) -> microscope_utils.AtomicGridMicroscopeFrame:
     """Gets the atomic grid for a particular field of view.
 
@@ -197,11 +201,6 @@ class Material(abc.ABC):
       observers: Iterable[microscope_utils.SimulatorObserver] = (),
   ) -> None:
     """Simulates controls applied to the material."""
-
-  @property
-  @abc.abstractmethod
-  def atomic_grid(self) -> microscope_utils.AtomicGridMaterialFrame:
-    """Gets the atomic grid representing the current material state."""
 
 
 def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
@@ -273,33 +272,27 @@ def generate_pristine_graphene(
   return positions
 
 
-# A function that takes an atomic grid representing the current material
-# state, a probe position, a silicon atom position, and positions of the
-# 3 nearest neighbors, and returns the rate at which the silicon atom
-# swaps places with its nearest neighbors.
-# TODO(joshgreaves): Delete this once the interfaces have been updated.
-RatePredictionFn = Callable[
-    [
-        microscope_utils.AtomicGridMaterialFrame,
-        geometry.Point,
-        np.ndarray,
-        np.ndarray,
-    ],
-    np.ndarray,
-]
-CanonicalRatePredictionFn = Callable[
-    [
-        microscope_utils.AtomicGridMaterialFrame,
-        geometry.PointMaterialFrame,
-        np.ndarray,
-        np.ndarray,
-    ],
-    np.ndarray,
-]
+class CanonicalRatePredictionFn(Protocol):
+  """A rate predictor for use with PristineSingleSiGrRatePredictor.
+
+  Takes an atomic grid representing the current material
+  state, a probe position, a silicon atom position, and positions of the
+  3 nearest neighbors, and returns the rate at which the silicon atom
+  swaps places with its nearest neighbors.
+  """
+
+  def __call__(
+      self,
+      grid: microscope_utils.AtomicGridMaterialFrame,
+      beam_position: geometry.PointMaterialFrame,
+      silicon_position: np.ndarray,
+      neighbor_indices: np.ndarray,
+  ) -> np.ndarray:
+    ...
 
 
 @dataclasses.dataclass(frozen=True)
-class PristineSingleSiGrRatePredictor:
+class PristineSingleSiGrRatePredictor(RateFunction):
   """A single silicon, pristine graphene rate predictor."""
 
   canonical_rate_prediction_fn: CanonicalRatePredictionFn
@@ -308,21 +301,13 @@ class PristineSingleSiGrRatePredictor:
       self,
       grid: microscope_utils.AtomicGridMaterialFrame,
       beam_position: geometry.PointMaterialFrame,
-  ) -> List[SuccessorState]:
+  ) -> Rates:
     silicon_position = get_single_silicon_position(grid)
 
-    _, si_neighbor_indices = (
-        neighbors.NearestNeighbors(
-            n_neighbors=1 + 3,
-            metric='l2',
-            algorithm='brute',
-        )
-        .fit(grid.atom_positions)
-        .kneighbors(silicon_position.reshape(1, 2))
-    )
-
-    # Get the nearest neighbors, ignoring the silicon atom.
-    si_neighbor_indices = si_neighbor_indices[0, 1:]
+    si_neighbor_indices = geometry.nearest_neighbors3(
+        grid.atom_positions, silicon_position
+    ).neighbor_indices
+    si_neighbor_indices = si_neighbor_indices.reshape(-1)
 
     transition_rates = self.canonical_rate_prediction_fn(
         grid,
@@ -333,6 +318,7 @@ class PristineSingleSiGrRatePredictor:
     transition_rates = np.asarray(transition_rates).astype(np.float32)
 
     assert (transition_rates >= 0).all(), 'transition_rates were not positive.'
+    assert transition_rates.size == si_neighbor_indices.size
 
     # Create successor grids associated with the rates.
     atom_positions = grid.atom_positions  # Atom positions remain fixed.
@@ -349,7 +335,7 @@ class PristineSingleSiGrRatePredictor:
           )
       )
 
-    return successor_states
+    return Rates(successor_states)
 
 
 class PristineSingleDopedGraphene(Material):
@@ -362,39 +348,38 @@ class PristineSingleDopedGraphene(Material):
   def __init__(
       self,
       *,
-      predict_rates: RatePredictionFn = simple_transition_rates,
+      rate_function: RateFunction = PristineSingleSiGrRatePredictor(
+          canonical_rate_prediction_fn=simple_canonical_rate_function,
+      ),
       grid_columns: int = 50,
   ):
     self._grid_columns = grid_columns
 
     # Set in reset, declared here to help type-checkers.
     self._has_been_reset = False
-    self.atom_positions: np.ndarray
-    self.atomic_numbers: np.ndarray
-    self.nearest_neighbors: neighbors.NearestNeighbors
-    self._predict_rates = predict_rates
+    self.grid: microscope_utils.AtomicGridMaterialFrame
+    self._rate_function = rate_function
 
   def reset(self, rng: np.random.Generator) -> None:
     self._has_been_reset = True
 
-    self.atom_positions = generate_pristine_graphene(rng, self._grid_columns)
-
-    self.nearest_neighbors = neighbors.NearestNeighbors(
-        n_neighbors=1 + 3,
-        metric='l2',
-        algorithm='brute',
-    ).fit(self.atom_positions)
-
-    num_atoms = self.atom_positions.shape[0]
-    self.atomic_numbers = np.full(num_atoms, constants.CARBON)
+    atom_positions = generate_pristine_graphene(rng, self._grid_columns)
+    num_atoms = atom_positions.shape[0]
+    atomic_numbers = np.full(num_atoms, constants.CARBON)
 
     # Choose the point closest to the center for the silicon starting point.
-    distances = np.linalg.norm(self.atom_positions, axis=1)
+    distances = np.linalg.norm(atom_positions, axis=1)
     si_index = np.argmin(distances)
-    self.atomic_numbers[si_index] = constants.SILICON
+    atomic_numbers[si_index] = constants.SILICON
+
+    self.grid = microscope_utils.AtomicGridMaterialFrame(
+        microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+    )
 
   def get_atoms_in_bounds(
-      self, lower_left: geometry.Point, upper_right: geometry.Point
+      self,
+      lower_left: geometry.PointMaterialFrame,
+      upper_right: geometry.PointMaterialFrame,
   ) -> microscope_utils.AtomicGridMicroscopeFrame:
     """Gets the atomic grid for a particular field of view.
 
@@ -416,14 +401,14 @@ class PristineSingleDopedGraphene(Material):
 
     indices_in_bounds = np.all(
         (
-            (lower_left <= self.atom_positions)
-            & (self.atom_positions <= upper_right)
+            (lower_left <= self.grid.atom_positions)
+            & (self.grid.atom_positions <= upper_right)
         ),
         axis=1,
     )
 
-    selected_atom_positions = self.atom_positions[indices_in_bounds]
-    selected_atomic_numbers = self.atomic_numbers[indices_in_bounds]
+    selected_atom_positions = self.grid.atom_positions[indices_in_bounds]
+    selected_atomic_numbers = self.grid.atomic_numbers[indices_in_bounds]
 
     # Normalize atom positions in [0, 1]
     delta = (upper_right - lower_left).reshape(1, -1)
@@ -450,28 +435,14 @@ class PristineSingleDopedGraphene(Material):
     # until the dwell time is over.
     elapsed_time = dt.timedelta(seconds=0)
     while elapsed_time < control.dwell_time:
-      silicon_position = self.get_silicon_position()
-
-      # Get silicon transition probabilities.
-      _, si_neighbors_index = self.nearest_neighbors.kneighbors(
-          silicon_position.reshape(1, 2)
+      rates = self._rate_function(
+          self.grid, geometry.PointMaterialFrame(control.position)
       )
-      # Get the nearest neighbors, ignore the atom itself.
-      si_neighbors_index = si_neighbors_index[0, 1:]
-
-      transition_rates = self._predict_rates(
-          self.atomic_grid,
-          control.position,
-          silicon_position,
-          si_neighbors_index,
-      )
-      transition_rates = np.asarray(transition_rates).astype(np.float32)
-      total_rate = np.sum(transition_rates)
 
       # The time at which the next transition takes place is modeled
       # by an exponential distribution, with the total rate as the
       # parameter. Scale is the inverse rate.
-      transition_seconds = rng.exponential(scale=1.0 / total_rate)
+      transition_seconds = rng.exponential(scale=1.0 / rates.total_rate)
       # Avoid np.inf when using very small rates. Clip arbitrarily to 1 hour.
       transition_seconds = min(transition_seconds, 3600)
       transition_time = dt.timedelta(seconds=transition_seconds)
@@ -484,35 +455,27 @@ class PristineSingleDopedGraphene(Material):
       # enough. Therefore, don't transition and break out of the loop.
       if elapsed_time <= control.dwell_time:
         # Update the silicon position
-        neighbors_prob = transition_rates / total_rate
+        successor_states_rates = np.asarray(
+            [ss.rate for ss in rates.successor_states], dtype=np.float32
+        )
+        successor_states_prob = successor_states_rates / rates.total_rate
 
         # Pick index to transition to.
-        si_atom_index = rng.choice(si_neighbors_index, p=neighbors_prob)
-        self.atomic_numbers[self.atomic_numbers == constants.SILICON] = (
-            constants.CARBON
+        successor_state_idx = rng.choice(
+            successor_states_prob.size, p=successor_states_prob
         )
-        self.atomic_numbers[si_atom_index] = constants.SILICON
+        self.grid = rates.successor_states[successor_state_idx].grid
 
         for observer in observers:
           observer.observe_transition(
               time_since_control_was_applied=elapsed_time,
-              grid=self.atomic_grid,
+              grid=self.grid,
           )
-
-  @property
-  def atomic_grid(self) -> microscope_utils.AtomicGridMaterialFrame:
-    """Gets the atomic grid representing the current material state."""
-    self._assert_has_been_reset('atomic_grid')
-    return microscope_utils.AtomicGridMaterialFrame(
-        microscope_utils.AtomicGrid(
-            self.atom_positions, np.copy(self.atomic_numbers)
-        )
-    )
 
   def get_silicon_position(self) -> np.ndarray:
     self._assert_has_been_reset('get_silicon_position')
-    return self.atom_positions[
-        self.atomic_numbers == constants.SILICON
+    return self.grid.atom_positions[
+        self.grid.atomic_numbers == constants.SILICON
     ].reshape(-1)
 
   def _assert_has_been_reset(self, fn_name: str) -> None:

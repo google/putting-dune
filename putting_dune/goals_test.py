@@ -43,9 +43,13 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
       obs = self.sim.reset(self.rng)
       self.goal.reset(self.rng, obs)
 
-      neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
-          self.goal.goal_position_material_frame.reshape(1, -1)
-      )
+      # We don't need all 3 nearest neighbors, but this function
+      # is convenient to use.
+      neighbor_distances = geometry.nearest_neighbors3(
+          self.material.grid.atom_positions,
+          self.goal.goal_position_material_frame,
+          include_self=True,
+      ).neighbor_distances
       self.assertLess(neighbor_distances[0, 0], 1e-3)
 
   def test_goal_position_is_not_set_near_an_edge(self):
@@ -59,9 +63,10 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
       self.goal.reset(self.rng, obs)
 
       # We look at the neighbor distances in the material frame.
-      neighbor_distances, _ = self.material.nearest_neighbors.kneighbors(
-          self.goal.goal_position_material_frame.reshape(1, -1)
-      )
+      neighbor_distances = geometry.nearest_neighbors3(
+          self.material.grid.atom_positions,
+          self.goal.goal_position_material_frame,
+      ).neighbor_distances
       self.assertLessEqual(
           neighbor_distances[0, -1],
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
@@ -100,11 +105,11 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
             )
         ),
         fov=microscope_utils.MicroscopeFieldOfView(
-            lower_left=geometry.Point(
-                self.goal.goal_position_material_frame - 10.0
+            lower_left=geometry.PointMaterialFrame(
+                geometry.Point(self.goal.goal_position_material_frame - 10.0)
             ),
-            upper_right=geometry.Point(
-                self.goal.goal_position_material_frame + 10.0
+            upper_right=geometry.PointMaterialFrame(
+                geometry.Point(self.goal.goal_position_material_frame + 10.0)
             ),
         ),
         controls=obs.controls,

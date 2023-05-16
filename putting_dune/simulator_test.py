@@ -63,23 +63,31 @@ class SimulatorTest(parameterized.TestCase):
       dict(
           testcase_name='unit_fov',
           control_position=_ARBITRARY_CONTROL.position,
-          fov_lower_left=geometry.Point((0.0, 0.0)),
-          fov_upper_right=geometry.Point((1.0, 1.0)),
+          fov_lower_left=geometry.PointMaterialFrame(
+              geometry.Point((0.0, 0.0))
+          ),
+          fov_upper_right=geometry.PointMaterialFrame(
+              geometry.Point((1.0, 1.0))
+          ),
           predicted_control_position=_ARBITRARY_CONTROL.position,
       ),
       dict(
           testcase_name='corner_of_fov',
           control_position=geometry.Point((0.0, 1.0)),
-          fov_lower_left=geometry.Point((-5.5, -6.3)),
-          fov_upper_right=geometry.Point((12.0, 9.1)),
+          fov_lower_left=geometry.PointMaterialFrame(
+              geometry.Point((-5.5, -6.3))
+          ),
+          fov_upper_right=geometry.PointMaterialFrame(
+              geometry.Point((12.0, 9.1))
+          ),
           predicted_control_position=geometry.Point((-5.5, 9.1)),
       ),
   )
   def test_simulator_positions_probe_correctly(
       self,
       control_position: geometry.Point,
-      fov_lower_left: geometry.Point,
-      fov_upper_right: geometry.Point,
+      fov_lower_left: geometry.PointMaterialFrame,
+      fov_upper_right: geometry.PointMaterialFrame,
       predicted_control_position: geometry.Point,
   ) -> None:
     sim = simulator.PuttingDuneSimulator(self._material)
@@ -130,7 +138,7 @@ class SimulatorTest(parameterized.TestCase):
 
   @mock.patch.object(
       graphene,
-      'simple_transition_rates',
+      'simple_canonical_rate_function',
       autospec=True,
       # No events should ever happen, so we won't need to worry about
       # two images being taken when the silicon approaches the FOV edge.
@@ -187,12 +195,12 @@ class SimulatorTest(parameterized.TestCase):
 
     sim.step_and_image(self._rng, [_ARBITRARY_CONTROL])
 
-    atom_positions_before_reset = np.copy(sim.material.atom_positions)
+    atom_positions_before_reset = np.copy(sim.material.grid.atom_positions)
     image_parameters_before_reset = sim._image_parameters
 
     sim.reset(self._rng)
 
-    atom_positions_after_reset = np.copy(sim.material.atom_positions)
+    atom_positions_after_reset = np.copy(sim.material.grid.atom_positions)
     image_parameters_after_reset = sim._image_parameters
 
     # Check the material was reinitialized.
@@ -209,7 +217,7 @@ class SimulatorTest(parameterized.TestCase):
 
   @mock.patch.object(
       graphene,
-      'simple_transition_rates',
+      'simple_canonical_rate_function',
       autospec=True,
       # About 15 events should occur per second on average.
       return_value=np.full((3,), 5.0, dtype=np.float32),
@@ -217,7 +225,11 @@ class SimulatorTest(parameterized.TestCase):
   def test_simulator_calls_observers_correctly(self, mock_rate_fn):
     observer = simulator_observers.EventObserver()
 
-    material = graphene.PristineSingleDopedGraphene(predict_rates=mock_rate_fn)
+    material = graphene.PristineSingleDopedGraphene(
+        rate_function=graphene.PristineSingleSiGrRatePredictor(
+            canonical_rate_prediction_fn=mock_rate_fn
+        )
+    )
     sim = simulator.PuttingDuneSimulator(material, observers=(observer,))
 
     obs = sim.reset(self._rng)
@@ -284,8 +296,10 @@ class SimulatorTest(parameterized.TestCase):
     fov_width = 10.0
     lower_left = silicon_position - fov_width * target_percentiles
     original_fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point(lower_left),
-        upper_right=geometry.Point(lower_left + fov_width),
+        lower_left=geometry.PointMaterialFrame(geometry.Point(lower_left)),
+        upper_right=geometry.PointMaterialFrame(
+            geometry.Point(lower_left + fov_width)
+        ),
     )
     sim._fov = original_fov
 

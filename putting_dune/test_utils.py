@@ -77,7 +77,7 @@ def create_single_silicon_pristine_sigr(
   # Set up a grid.
   atom_positions = graphene.generate_pristine_graphene(rng)
   atomic_numbers = np.full((atom_positions.shape[0],), constants.CARBON)
-  si_idx = np.argmax(np.sum(atom_positions**2, axis=1))  # Nearest (0, 0)
+  si_idx = np.argmin(np.sum(atom_positions**2, axis=1))  # Nearest (0, 0)
   atomic_numbers[si_idx] = constants.SILICON
   grid = microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
   return microscope_utils.AtomicGridMaterialFrame(grid)

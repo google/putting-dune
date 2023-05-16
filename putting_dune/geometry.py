@@ -14,11 +14,13 @@
 
 """Geometry manipulations."""
 
+import dataclasses
 from typing import NewType
 
 from jax import numpy as jnp
 import numpy as np
 from shapely import geometry as shapely_geometry
+from sklearn import neighbors
 
 # Since we import geometry from shapely to get a point, we create
 # an alias here to avoid a name overlap between our geometry module
@@ -80,3 +82,26 @@ def jnp_rotate_coordinates(coord: np.ndarray, theta: float):
       [[jnp.cos(theta), jnp.sin(theta)], [-jnp.sin(theta), jnp.cos(theta)]]
   )
   return coord @ rotation_matrix
+
+
+@dataclasses.dataclass(frozen=True)
+class NearestNeighborsResult:
+  neighbor_distances: np.ndarray
+  neighbor_indices: np.ndarray
+
+
+def nearest_neighbors3(
+    atom_positions: np.ndarray, query: np.ndarray, *, include_self: bool = False
+) -> NearestNeighborsResult:
+  """Gets the 3 (4 including self) nearest neighbors for each row of query."""
+  neighbor_distances, neighbor_indices = (
+      neighbors.NearestNeighbors(n_neighbors=4, metric='l2')
+      .fit(atom_positions)
+      .kneighbors(query.reshape(-1, 2))
+  )
+
+  if not include_self:
+    neighbor_distances = neighbor_distances[:, 1:]  # d(query, neighbors)
+    neighbor_indices = neighbor_indices[:, 1:]  # (query, neighbors)
+
+  return NearestNeighborsResult(neighbor_distances, neighbor_indices)

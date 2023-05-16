@@ -82,7 +82,7 @@ class PuttingDuneSimulator:
     )
 
     for observer in self._observers:
-      observer.observe_reset(self.material.atomic_grid, self._fov)
+      observer.observe_reset(self.material.grid, self._fov)
 
     observed_grid, elapsed_time = self._get_observed_grid_and_elapsed_time()
 

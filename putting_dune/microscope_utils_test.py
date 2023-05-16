@@ -38,8 +38,8 @@ _BEAM_CONTROL = microscope_utils.BeamControl(
     voltage_kv=2,
 )
 _FOV = microscope_utils.MicroscopeFieldOfView(
-    lower_left=geometry.Point((2.1, -6.7)),
-    upper_right=geometry.Point((3.2, -2.8)),
+    lower_left=geometry.PointMaterialFrame(geometry.Point((2.1, -6.7))),
+    upper_right=geometry.PointMaterialFrame(geometry.Point((3.2, -2.8))),
 )
 _OBSERVATION = microscope_utils.MicroscopeObservation(
     grid=microscope_utils.AtomicGridMicroscopeFrame(_ATOMIC_GRID),
@@ -85,8 +85,8 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_field_of_view_correctly_calculates_offset(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((0.0, 1.0)),
-        upper_right=geometry.Point((1.0, 3.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((0.0, 1.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((1.0, 3.0))),
     )
 
     offset = np.asarray(fov.offset.coords).reshape(-1)
@@ -94,24 +94,24 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_field_of_view_correctly_calculates_width(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((0.0, 1.0)),
-        upper_right=geometry.Point((1.0, 3.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((0.0, 1.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((1.0, 3.0))),
     )
 
     self.assertAlmostEqual(fov.width, 1.0)
 
   def test_field_of_view_correctly_calculates_height(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((0.0, 1.0)),
-        upper_right=geometry.Point((1.0, 3.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((0.0, 1.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((1.0, 3.0))),
     )
 
     self.assertAlmostEqual(fov.height, 2.0)
 
   def test_fov_to_string_formats_string_as_expected(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((0.128, -5.699)),
-        upper_right=geometry.Point((1.234, 8.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((0.128, -5.699))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((1.234, 8.0))),
     )
 
     fov_str = str(fov)
@@ -120,8 +120,8 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_fov_converts_grid_frames_of_reference(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((-5.0, 0.0)),
-        upper_right=geometry.Point((5.0, 20.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((-5.0, 0.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((5.0, 20.0))),
     )
     microscope_grid_before = microscope_utils.AtomicGridMicroscopeFrame(
         microscope_utils.AtomicGrid(
@@ -149,8 +149,8 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_fov_resizes_correctly(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((-5.0, 0.0)),
-        upper_right=geometry.Point((5.0, 20.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((-5.0, 0.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((5.0, 20.0))),
     )
 
     with self.subTest('zoom_in_2'):
@@ -174,11 +174,11 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_fov_converts_beamcontrolframes_of_reference(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((-5.0, 0.0)),
-        upper_right=geometry.Point((5.0, 20.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((-5.0, 0.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((5.0, 20.0))),
     )
 
-    point = geometry.Point((0.5, 1.0))
+    point = geometry.PointMicroscopeFrame(geometry.Point((0.5, 1.0)))
 
     material_point = fov.microscope_frame_to_material_frame(point)
     microscope_point = fov.material_frame_to_microscope_frame(material_point)
@@ -213,8 +213,8 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_fov_converts_ndarray_frames_of_reference(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((-5.0, 0.0)),
-        upper_right=geometry.Point((5.0, 20.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((-5.0, 0.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((5.0, 20.0))),
     )
     points = np.asarray([[0.5, 1.0], [-3.0, 2.5]])
 
@@ -232,10 +232,10 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_fov_converts_point_frames_of_reference(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((-5.0, 0.0)),
-        upper_right=geometry.Point((5.0, 20.0)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((-5.0, 0.0))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((5.0, 20.0))),
     )
-    point = geometry.Point((0.5, 1.0))
+    point = geometry.PointMicroscopeFrame(geometry.Point((0.5, 1.0)))
 
     material_point = fov.microscope_frame_to_material_frame(point)
     microscope_point = fov.material_frame_to_microscope_frame(material_point)
@@ -251,8 +251,8 @@ class SimulatorUtilsTest(absltest.TestCase):
 
   def test_fov_get_atoms_in_bounds(self):
     fov = microscope_utils.MicroscopeFieldOfView(
-        lower_left=geometry.Point((2.5, 2.5)),
-        upper_right=geometry.Point((7.5, 7.5)),
+        lower_left=geometry.PointMaterialFrame(geometry.Point((2.5, 2.5))),
+        upper_right=geometry.PointMaterialFrame(geometry.Point((7.5, 7.5))),
     )
 
     x_positions = np.linspace(0, 10, 11)
@@ -339,16 +339,16 @@ class SimulatorUtilsTest(absltest.TestCase):
     control_proto = putting_dune_pb2.BeamControl(
         position=putting_dune_pb2.Point2D(x=10.0, y=15.3),
         dwell_time_seconds=1.72,
-        voltage_kv=2.,
-        current_na=1.,
+        voltage_kv=2.0,
+        current_na=1.0,
     )
     control = microscope_utils.BeamControl.from_proto(control_proto)
 
     self.assertAlmostEqual(control.position.x, 10.0, delta=1e-6)
     self.assertAlmostEqual(control.position.y, 15.3, delta=1e-6)
     self.assertAlmostEqual(control.dwell_time.total_seconds(), 1.72, delta=1e-6)
-    self.assertAlmostEqual(control.voltage_kv, 2., delta=1e-6)
-    self.assertAlmostEqual(control.current_na, 1., delta=1e-6)
+    self.assertAlmostEqual(control.voltage_kv, 2.0, delta=1e-6)
+    self.assertAlmostEqual(control.current_na, 1.0, delta=1e-6)
 
   def test_field_of_view_converts_to_proto(self):
     proto_fov = _FOV.to_proto()
@@ -475,8 +475,9 @@ class SimulatorUtilsTest(absltest.TestCase):
     with self.subTest('image'):
       np.testing.assert_allclose(observation.image, _OBSERVATION.image)
     with self.subTest('label_image'):
-      np.testing.assert_allclose(observation.label_image,
-                                 _OBSERVATION.label_image)
+      np.testing.assert_allclose(
+          observation.label_image, _OBSERVATION.label_image
+      )
 
   def test_transition_converts_to_proto(self):
     transition_proto = _TRANSITION.to_proto()
@@ -616,16 +617,20 @@ class SimulatorUtilsTest(absltest.TestCase):
       )
 
     with self.subTest('image'):
-      np.testing.assert_allclose(transition.image_before,
-                                 _TRANSITION.image_before)
-      np.testing.assert_allclose(transition.image_after,
-                                 _TRANSITION.image_after)
+      np.testing.assert_allclose(
+          transition.image_before, _TRANSITION.image_before
+      )
+      np.testing.assert_allclose(
+          transition.image_after, _TRANSITION.image_after
+      )
 
     with self.subTest('label_image'):
-      np.testing.assert_allclose(transition.label_image_before,
-                                 _TRANSITION.label_image_before)
-      np.testing.assert_allclose(transition.label_image_after,
-                                 _TRANSITION.label_image_after)
+      np.testing.assert_allclose(
+          transition.label_image_before, _TRANSITION.label_image_before
+      )
+      np.testing.assert_allclose(
+          transition.label_image_after, _TRANSITION.label_image_after
+      )
 
   def test_trajectory_can_be_created_from_proto(self):
     # We already have tests that to_proto works successfully, so

@@ -32,7 +32,8 @@ class SimulatorObserversTest(absltest.TestCase):
         microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
     )
     fov = microscope_utils.MicroscopeFieldOfView(
-        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
+        geometry.PointMaterialFrame(geometry.Point((0.0, 0.0))),
+        geometry.PointMaterialFrame(geometry.Point((1.0, 1.0))),
     )
     observer.observe_reset(grid, fov)
     observer.observe_apply_control(
@@ -71,7 +72,8 @@ class SimulatorObserversTest(absltest.TestCase):
         microscope_utils.AtomicGrid(np.zeros((5, 2)), np.zeros(5))
     )
     fov = microscope_utils.MicroscopeFieldOfView(
-        geometry.Point((0.0, 0.0)), geometry.Point((1.0, 1.0))
+        geometry.PointMaterialFrame(geometry.Point((0.0, 0.0))),
+        geometry.PointMaterialFrame(geometry.Point((1.0, 1.0))),
     )
 
     observer.observe_reset(grid, fov)
