@@ -328,6 +328,78 @@ class SimulatorUtilsTest(absltest.TestCase):
         atomic_grid.atomic_numbers, np.asarray([0, 2, 5])
     )
 
+  def test_atomic_grid_hashes_same_grid_to_same_hash(self):
+    grid1 = _ATOMIC_GRID
+    grid2 = microscope_utils.AtomicGrid(
+        grid1.atom_positions, grid1.atomic_numbers
+    )
+
+    self.assertEqual(hash(grid1), hash(grid2))
+
+  def test_atomic_grid_hashes_translated_grid_to_different_hash(self):
+    grid1 = _ATOMIC_GRID
+    grid2 = microscope_utils.AtomicGrid(
+        grid1.atom_positions + np.asarray([[5.0, -7.325]]), grid1.atomic_numbers
+    )
+
+    self.assertNotEqual(hash(grid1), hash(grid2))
+
+  def test_atomic_grid_hashes_same_positions_different_atoms_differently(self):
+    grid1 = _ATOMIC_GRID
+    atomic_numbers = grid1.atomic_numbers.copy()
+    atomic_numbers[0] = atomic_numbers[0] + 1
+    grid2 = microscope_utils.AtomicGrid(grid1.atom_positions, atomic_numbers)
+
+    self.assertNotEqual(hash(grid1), hash(grid2))
+
+  def test_atomic_grid_hashes_different_positions_differently(self):
+    grid1 = _ATOMIC_GRID
+    atom_positions = grid1.atom_positions.copy()
+    atom_positions[0, :] = atom_positions[0, :] + np.asarray([3.0, 4.0])
+    grid2 = microscope_utils.AtomicGrid(atom_positions, grid1.atomic_numbers)
+
+    self.assertNotEqual(hash(grid1), hash(grid2))
+
+  def test_atomic_grid_is_equal_to_same_atomic_grid(self):
+    grid1 = _ATOMIC_GRID
+    grid2 = microscope_utils.AtomicGrid(
+        grid1.atom_positions.copy(), grid1.atomic_numbers.copy()
+    )
+    self.assertEqual(grid1, grid2)
+
+  def test_atomic_grid_is_not_equal_to_grid_with_different_num_atoms(self):
+    grid1 = _ATOMIC_GRID
+    atom_positions = np.delete(grid1.atom_positions, 0)
+    atomic_numbers = np.delete(grid1.atomic_numbers, 0)
+    grid2 = microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+
+    self.assertNotEqual(grid1, grid2)
+
+  def test_atomic_grid_is_not_equal_to_translated_grid(self):
+    grid1 = _ATOMIC_GRID
+    grid2 = microscope_utils.AtomicGrid(
+        grid1.atom_positions + np.asarray([[5.0, -7.325]]), grid1.atomic_numbers
+    )
+
+    self.assertNotEqual(grid1, grid2)
+
+  def test_atomic_grid_is_not_equal_to_grid_with_different_atoms(self):
+    grid1 = _ATOMIC_GRID
+    atomic_numbers = grid1.atomic_numbers.copy()
+    atomic_numbers[0] = atomic_numbers[0] + 1
+    grid2 = microscope_utils.AtomicGrid(grid1.atom_positions, atomic_numbers)
+
+    self.assertNotEqual(grid1, grid2)
+
+  def test_atomic_grid_hash_is_equal_if_grids_are_equal(self):
+    grid1 = _ATOMIC_GRID
+    grid2 = microscope_utils.AtomicGrid(
+        grid1.atom_positions.copy(), grid1.atomic_numbers.copy()
+    )
+
+    self.assertEqual(grid1, grid2)
+    self.assertEqual(hash(grid1), hash(grid2))
+
   def test_beam_control_converts_to_proto(self):
     control_proto = _BEAM_CONTROL.to_proto()
 

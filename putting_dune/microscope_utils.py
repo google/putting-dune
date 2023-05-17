@@ -22,6 +22,7 @@ from typing import NewType, Optional, Sequence, Tuple
 import numpy as np
 from putting_dune import geometry
 from putting_dune import putting_dune_pb2
+from sklearn import neighbors
 import tensorflow as tf
 
 
@@ -82,6 +83,59 @@ class AtomicGrid:
       )
 
     return grid
+
+  def __hash__(self) -> int:
+    """Computes a hash for the atomic grid.
+
+    This is intended to be a fast hash function, and does not take
+    into account any translation or rotation invariance.
+
+    The hash is computed as the distance of each atom from the origin,
+    weighted by the type of atom, with some small modifications.
+
+    Returns:
+      A hash for the atomic grid.
+    """
+
+    # First, compute a modifier based on the atomic number.
+    # This is to distinguish between grids with different atoms in them.
+    # The modifier is a function of the atomic number to ensure that
+    # the modifier for different atoms are not merely multiples of each other.
+    # pi / 3 is chosen as a base since it is irrational and only slightly
+    # larger than 1 to avoid generating large values.
+    # We round to hash very similar grids to the same value.
+    modifier = np.around((np.pi / 3) ** self.atomic_numbers, decimals=2)
+
+    # Next, we compute the (squared) distances of every atom from the origin.
+    # We add 1 to the square distance, otherwise the modifier will have no
+    # effect on atoms at (0, 0) and they won't be distinguished.
+    sq_distance = np.sum(np.square(self.atom_positions), axis=-1) + 1
+    result = modifier * sq_distance
+
+    # Finally, round so that we return an int.
+    return int(round(np.sum(np.around(result, 2) * 100)))
+
+  def __eq__(self, other: 'AtomicGrid') -> bool:
+    # Note: This is NOT translation or rotation invariant.
+    if self.atom_positions.shape != other.atom_positions.shape:
+      return False
+    if self.atomic_numbers.shape != other.atomic_numbers.shape:
+      return False
+
+    neighbor_distances, neighbor_indices = (
+        neighbors.NearestNeighbors(n_neighbors=1)
+        .fit(self.atom_positions)
+        .kneighbors(other.atom_positions)
+    )
+
+    neighbor_indices = neighbor_indices.reshape(-1)
+    if (other.atomic_numbers != self.atomic_numbers[neighbor_indices]).any():
+      return False
+
+    if (neighbor_distances > 1e-3).any():
+      return False
+
+    return True
 
 
 AtomicGridMaterialFrame = NewType('AtomicGridMaterialFrame', AtomicGrid)
