@@ -50,7 +50,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
           self.goal.goal_position_material_frame,
           include_self=True,
       ).neighbor_distances
-      self.assertLess(neighbor_distances[0, 0], 1e-3)
+      self.assertLess(neighbor_distances[0], 1e-3)
 
   def test_goal_position_is_not_set_near_an_edge(self):
     # This is enforced implicitly - the goal is an atom position within
@@ -68,7 +68,7 @@ class SingleSiliconGoalReachingTest(absltest.TestCase):
           self.goal.goal_position_material_frame,
       ).neighbor_distances
       self.assertLessEqual(
-          neighbor_distances[0, -1],
+          neighbor_distances[-1],
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
       )
 

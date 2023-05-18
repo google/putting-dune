@@ -294,7 +294,7 @@ class GrapheneTest(absltest.TestCase):
           material.grid.atom_positions, material.get_silicon_position()
       ).neighbor_distances
       self.assertLessEqual(
-          neighbor_distances[0, -1],
+          neighbor_distances[-1],
           constants.CARBON_BOND_DISTANCE_ANGSTROMS + 1e-3,
       )
 

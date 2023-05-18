@@ -104,4 +104,8 @@ def nearest_neighbors3(
     neighbor_distances = neighbor_distances[:, 1:]  # d(query, neighbors)
     neighbor_indices = neighbor_indices[:, 1:]  # (query, neighbors)
 
+  if query.ndim == 1:
+    neighbor_distances = neighbor_distances.reshape(-1)
+    neighbor_indices = neighbor_indices.reshape(-1)
+
   return NearestNeighborsResult(neighbor_distances, neighbor_indices)
