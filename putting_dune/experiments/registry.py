@@ -34,7 +34,6 @@ from putting_dune.agents import tf_eval_agent
 from putting_dune.experiments import experiments
 
 
-
 # -------------------- AGENTS --------------------
 
 
@@ -367,6 +366,16 @@ _EVAL_EXPERIMENTS = frozendict.frozendict(
         ),
     }
 )
+
+
+def register_eval_experiment(
+    name: str, eval_experiment: experiments.EvalExperiment
+):
+  global _EVAL_EXPERIMENTS
+  if name not in _EVAL_EXPERIMENTS:
+    _EVAL_EXPERIMENTS = frozendict.frozendict(
+        {name: eval_experiment, **_EVAL_EXPERIMENTS}
+    )
 
 
 def create_microscope_experiment(name: str) -> experiments.MicroscopeExperiment:
