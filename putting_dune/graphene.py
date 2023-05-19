@@ -18,10 +18,13 @@ import abc
 import dataclasses
 import datetime as dt
 import functools
+import pathlib
 from typing import Iterable, Protocol, Sequence
 
 from absl import logging
+from etils import epath
 from jax.scipy import stats
+import msgpack_numpy as msgpack
 import numpy as np
 import numpy.typing as npt
 from putting_dune import constants
@@ -384,6 +387,60 @@ class GaussianMixtureRateFunction(RateFunction):
       successor_states.append(SuccessorState(new_grid, rate))
 
     return Rates(successor_states)
+
+  def serialize_to_directory(self, save_dir: pathlib.Path | str, /) -> None:
+    """Serializes this rate function to the specified directory."""
+    logging.info(
+        'Serializing %s to %s.', self.__class__.__name__, str(save_dir)
+    )
+    path = epath.Path(save_dir)
+    path.mkdir(parents=True, exist_ok=True)
+
+    bundle = {
+        'sem_ver': '1.0.0',
+        'max_rate': self.max_rate,
+        'mixture_weights': self.mixture_weights,
+        'loc_distances': self.loc_distances,
+        'variances': self.variances,
+    }
+
+    output_file = path / 'gmm_parameters.mpk'
+    output_file.write_bytes(msgpack.packb(bundle))
+
+  @classmethod
+  def deserialize_from_directory(
+      cls, load_dir: pathlib.Path | str, /
+  ) -> 'GaussianMixtureRateFunction':
+    """Deserializes a rate function from a specified directory."""
+    logging.info('Deserializing %s from %s', cls.__name__, str(load_dir))
+    path = epath.Path(load_dir)
+
+    input_file = path / 'gmm_parameters.mpk'
+    bundle = msgpack.unpackb(input_file.read_bytes())
+
+    # Note: msgpack turns strings into byte strings by default.
+    return cls(
+        max_rate=bundle[b'max_rate'],
+        mixture_weights=bundle[b'mixture_weights'],
+        loc_distances=bundle[b'loc_distances'],
+        variances=bundle[b'variances'],
+    )
+
+  def __eq__(self, other: 'GaussianMixtureRateFunction') -> bool:
+    # We consider very similar models to be the same, to account
+    # for any floating point precision errors.
+    if (
+        self.mixture_weights.shape != other.mixture_weights.shape
+        or self.loc_distances.shape != other.loc_distances.shape
+        or self.variances.shape != other.variances.shape
+        or abs(self.max_rate - other.max_rate) > 1e-3
+        or (np.abs(self.mixture_weights - other.mixture_weights) > 1e-3).any()
+        or (np.abs(self.loc_distances - other.loc_distances) > 1e-3).any()
+        or (np.abs(self.variances - other.variances) > 1e-3).any()
+    ):
+      return False
+
+    return True
 
 
 def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:

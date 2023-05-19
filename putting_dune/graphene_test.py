@@ -329,6 +329,26 @@ class GrapheneTest(absltest.TestCase):
     max_rate = max(x.rate for x in rates.successor_states)
     self.assertAlmostEqual(max_rate, 1.0, places=1)
 
+  def test_gaussian_mixture_rates_serializes_and_deserializes_correctly(self):
+    rate_fn = graphene.GaussianMixtureRateFunction(
+        max_rate=5.0,
+        mixture_weights=np.asarray((0.3, 0.3, 0.2, 0.1, 0.1)),
+        loc_distances=np.asarray((0.0, 1.0, 0.5, 0.0, 1.5)),
+        variances=np.asarray(
+            ((0.1, 0.1), (1.0, 1.0), (2.0, 0.5), (0.5, 2.0), (0.01, 0.01))
+        ),
+    )
+
+    out_dir = self.create_tempdir()
+    rate_fn.serialize_to_directory(out_dir.full_path)
+    deserialized_rate_fn = (
+        graphene.GaussianMixtureRateFunction.deserialize_from_directory(
+            out_dir.full_path
+        )
+    )
+
+    self.assertEqual(deserialized_rate_fn, rate_fn)
+
 
 class PristineSingleSiGrRatePredictorTest(absltest.TestCase):
 
