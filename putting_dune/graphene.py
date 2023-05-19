@@ -426,6 +426,24 @@ class GaussianMixtureRateFunction(RateFunction):
         variances=bundle[b'variances'],
     )
 
+  @classmethod
+  def sample_new(
+      cls, rng: np.random.Generator, /
+  ) -> 'GaussianMixtureRateFunction':
+    num_mixtures = rng.poisson(2.0) + 1
+    max_rate = rng.uniform(0.01, 1.0)
+    mixture_weights = rng.uniform(0.0, 10.0, size=(num_mixtures,))
+    mixture_weights = mixture_weights / np.sum(mixture_weights)
+    loc_distances = rng.uniform(-2.0, 3.0, size=(num_mixtures,))
+    variances = rng.uniform(0.1, 5.0, size=(num_mixtures, 2))
+
+    return GaussianMixtureRateFunction(
+        max_rate=max_rate,
+        mixture_weights=mixture_weights,
+        loc_distances=loc_distances,
+        variances=variances,
+    )
+
   def __eq__(self, other: 'GaussianMixtureRateFunction') -> bool:
     # We consider very similar models to be the same, to account
     # for any floating point precision errors.

@@ -349,6 +349,12 @@ class GrapheneTest(absltest.TestCase):
 
     self.assertEqual(deserialized_rate_fn, rate_fn)
 
+  def test_sample_new_gaussian_mixture_rates_returns_different_fn(self):
+    rate_fn1 = graphene.GaussianMixtureRateFunction.sample_new(self.rng)
+    rate_fn2 = graphene.GaussianMixtureRateFunction.sample_new(self.rng)
+
+    self.assertNotEqual(rate_fn1, rate_fn2)
+
 
 class PristineSingleSiGrRatePredictorTest(absltest.TestCase):
 
