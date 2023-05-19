@@ -17,14 +17,17 @@
 import abc
 import dataclasses
 import datetime as dt
+import functools
 from typing import Iterable, Protocol, Sequence
 
 from absl import logging
 from jax.scipy import stats
 import numpy as np
+import numpy.typing as npt
 from putting_dune import constants
 from putting_dune import geometry
 from putting_dune import microscope_utils
+import scipy.stats
 
 
 @dataclasses.dataclass(frozen=True)
@@ -52,8 +55,63 @@ class RateFunction(Protocol):
     ...
 
 
+class CanonicalRatePredictionFn(Protocol):
+  """A rate predictor for use with PristineSingleSiGrRatePredictor.
+
+  Takes an atomic grid representing the current material
+  state, a probe position, a silicon atom position, and positions of the
+  3 nearest neighbors, and returns the rate at which the silicon atom
+  swaps places with its nearest neighbors.
+  """
+
+  def __call__(
+      self,
+      grid: microscope_utils.AtomicGridMaterialFrame,
+      beam_position: geometry.PointMaterialFrame,
+      silicon_position: np.ndarray,
+      neighbor_indices: np.ndarray,
+  ) -> np.ndarray:
+    ...
+
+
 class SiliconNotFoundError(RuntimeError):
   ...
+
+
+# TODO(joshgreaves): Move interface if we support more than graphene.
+class Material(abc.ABC):
+  """Abstract base class for materials."""
+
+  @abc.abstractmethod
+  def get_atoms_in_bounds(
+      self,
+      lower_left: geometry.PointMaterialFrame,
+      upper_right: geometry.PointMaterialFrame,
+  ) -> microscope_utils.AtomicGridMicroscopeFrame:
+    """Gets the atomic grid for a particular field of view.
+
+    Args:
+      lower_left: The lower left position of the field of view.
+      upper_right: The upper right position of the field of view.
+
+    Returns:
+      The observed atomic grid within the supplied bounds. Atom positions
+        are normalized in [0, 1], where (0, 0) corresponds to lower_left and
+        (1, 1) corresponds to upper_right.
+    """
+
+  @abc.abstractmethod
+  def reset(self, rng: np.random.Generator) -> None:
+    """Resets the material."""
+
+  @abc.abstractmethod
+  def apply_control(
+      self,
+      rng: np.random.Generator,
+      control: microscope_utils.BeamControlMaterialFrame,
+      observers: Iterable[microscope_utils.SimulatorObserver] = (),
+  ) -> None:
+    """Simulates controls applied to the material."""
 
 
 def single_silicon_prior_rates(
@@ -167,40 +225,165 @@ class HumanPriorRatePredictor:
     return rates
 
 
-# TODO(joshgreaves): Move interface if we support more than graphene.
-class Material(abc.ABC):
-  """Abstract base class for materials."""
+@dataclasses.dataclass(frozen=True)
+class PristineSingleSiGrRatePredictor(RateFunction):
+  """A single silicon, pristine graphene rate predictor."""
 
-  @abc.abstractmethod
-  def get_atoms_in_bounds(
+  canonical_rate_prediction_fn: CanonicalRatePredictionFn
+
+  def __call__(
       self,
-      lower_left: geometry.PointMaterialFrame,
-      upper_right: geometry.PointMaterialFrame,
-  ) -> microscope_utils.AtomicGridMicroscopeFrame:
-    """Gets the atomic grid for a particular field of view.
+      grid: microscope_utils.AtomicGridMaterialFrame,
+      beam_position: geometry.PointMaterialFrame,
+  ) -> Rates:
+    silicon_position = get_single_silicon_position(grid)
 
-    Args:
-      lower_left: The lower left position of the field of view.
-      upper_right: The upper right position of the field of view.
+    si_neighbor_indices = geometry.nearest_neighbors3(
+        grid.atom_positions, silicon_position
+    ).neighbor_indices
+    si_neighbor_indices = si_neighbor_indices.reshape(-1)
 
-    Returns:
-      The observed atomic grid within the supplied bounds. Atom positions
-        are normalized in [0, 1], where (0, 0) corresponds to lower_left and
-        (1, 1) corresponds to upper_right.
-    """
+    transition_rates = self.canonical_rate_prediction_fn(
+        grid,
+        beam_position,
+        silicon_position,
+        si_neighbor_indices,
+    )
+    transition_rates = np.asarray(transition_rates).astype(np.float32)
 
-  @abc.abstractmethod
-  def reset(self, rng: np.random.Generator) -> None:
-    """Resets the material."""
+    assert (transition_rates >= 0).all(), 'transition_rates were not positive.'
+    assert transition_rates.size == si_neighbor_indices.size
 
-  @abc.abstractmethod
-  def apply_control(
+    # Create successor grids associated with the rates.
+    atom_positions = grid.atom_positions  # Atom positions remain fixed.
+    successor_states = []
+    for next_si_idx, rate in zip(si_neighbor_indices, transition_rates):
+      atomic_numbers = np.full_like(grid.atomic_numbers, constants.CARBON)
+      atomic_numbers[next_si_idx] = constants.SILICON
+      successor_states.append(
+          SuccessorState(
+              microscope_utils.AtomicGridMaterialFrame(
+                  microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+              ),
+              rate,
+          )
+      )
+
+    return Rates(successor_states)
+
+
+@dataclasses.dataclass(frozen=True)
+class GaussianMixtureRateFunction(RateFunction):
+  """A rate function that uses a mixture of Gaussians."""
+
+  max_rate: float
+  mixture_weights: npt.NDArray[np.float32]  # Shape (n_mixtures,)
+  loc_distances: npt.NDArray[np.float32]  # Shape (n_mixtures,)
+  variances: npt.NDArray[np.float32]  # Shape (n_mixtures, 2)
+
+  @functools.cached_property
+  def _normalizing_factor(self) -> float:
+    """Computes the normalizing factor the mixture."""
+    num_mixtures = len(self.mixture_weights)
+
+    # Get the peak values of the components to work out a normalizing factor.
+    max_mode_prob = 0.0
+    for i in range(num_mixtures):
+      covariance_matrix = np.diag(self.variances[i])
+      mode_prob = scipy.stats.multivariate_normal.pdf(
+          np.zeros(2), np.zeros(2), covariance_matrix
+      )
+      mode_prob = mode_prob * self.mixture_weights[i]
+      max_mode_prob = max(max_mode_prob, mode_prob)
+    return self.max_rate / max_mode_prob
+
+  def __call__(
       self,
-      rng: np.random.Generator,
-      control: microscope_utils.BeamControlMaterialFrame,
-      observers: Iterable[microscope_utils.SimulatorObserver] = (),
-  ) -> None:
-    """Simulates controls applied to the material."""
+      grid: microscope_utils.AtomicGridMaterialFrame,
+      beam_position: geometry.PointMaterialFrame,
+  ) -> Rates:
+    # TODO(joshgreaves): Break this function apart.
+    # I will imminently be refactoring the materials part of this project,
+    # and once that is done I can break this up nicely.
+    num_mixtures = len(self.mixture_weights)
+
+    # Get the silicon position and its 3 nearest neighbors.
+    si_pos = get_single_silicon_position(grid)
+    neighbor_indices = geometry.nearest_neighbors3(
+        grid.atom_positions, si_pos
+    ).neighbor_indices
+    neighbor_indices = neighbor_indices.reshape(-1)
+    neighbor_positions = grid.atom_positions[neighbor_indices]
+
+    # Compute the vectors from silicon to each of the three nearest neighbors.
+    # Then, construct vectors orthogonal to these. This will give us
+    # the principal components of the covariance matrix (which we will
+    # construct later).
+    neighbor_delta_vectors = neighbor_positions - si_pos.reshape(1, 2)
+    orthog_vectors = np.empty_like(neighbor_delta_vectors)
+    orthog_vectors[:, 0] = -neighbor_delta_vectors[:, 1]
+    orthog_vectors[:, 1] = neighbor_delta_vectors[:, 0]
+
+    # Normalize the basis vectors.
+    basis_vectors1 = neighbor_delta_vectors / np.linalg.norm(
+        neighbor_delta_vectors, axis=-1, keepdims=True
+    )
+    basis_vectors2 = orthog_vectors / np.linalg.norm(
+        orthog_vectors, axis=-1, keepdims=True
+    )
+
+    successor_states = []
+
+    # Calculate the rate for each neighbor.
+    for i, neighbor_idx in enumerate(neighbor_indices):
+      # To compute the covariance matrix, we will need the matrix of
+      # eigenvectors, along with the inverse of that matrix.
+      covariance_eigenvectors = np.transpose(
+          np.vstack((basis_vectors1[i], basis_vectors2[i]))
+      )
+      covariance_eigenvectors_inv = np.linalg.pinv(covariance_eigenvectors)
+
+      # Accumulate the rate across all mixtures.
+      rate = 0.0
+      for mixture_idx in range(num_mixtures):
+        # The gaussian mean is found a fixed distance along the vector
+        # to the neighbor from the silicon atom.
+        loc = (
+            si_pos + neighbor_delta_vectors[i] * self.loc_distances[mixture_idx]
+        )
+
+        # The covariance is calculated using the eigenvector matrix
+        # and a diagonal matrix indicating the variance in the direction
+        # of each eigenvector.
+        diagonal_variance = np.diag(self.variances[mixture_idx])
+        covariance_matrix = (
+            covariance_eigenvectors
+            @ diagonal_variance
+            @ covariance_eigenvectors_inv
+        )
+
+        # Calculate the multivariate gaussian probability density.
+        probability_density = scipy.stats.multivariate_normal.pdf(
+            np.asarray(beam_position.coords), loc, covariance_matrix
+        )
+
+        # Weight the probability by the normalizing factor, along with
+        # the mixture weight to get its contribution to the total weight.
+        mixture_rate = probability_density * self._normalizing_factor
+        rate += mixture_rate * self.mixture_weights[mixture_idx]
+
+      # Construct the new atomic grid for this neighbor's transition.
+      new_atomic_numbers = np.full_like(grid.atomic_numbers, constants.CARBON)
+      new_atomic_numbers[neighbor_idx] = constants.SILICON
+      new_grid = microscope_utils.AtomicGridMaterialFrame(
+          microscope_utils.AtomicGrid(
+              grid.atom_positions,
+              new_atomic_numbers,
+          )
+      )
+      successor_states.append(SuccessorState(new_grid, rate))
+
+    return Rates(successor_states)
 
 
 def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
@@ -270,72 +453,6 @@ def generate_pristine_graphene(
   positions = positions @ rotation_matrix
 
   return positions
-
-
-class CanonicalRatePredictionFn(Protocol):
-  """A rate predictor for use with PristineSingleSiGrRatePredictor.
-
-  Takes an atomic grid representing the current material
-  state, a probe position, a silicon atom position, and positions of the
-  3 nearest neighbors, and returns the rate at which the silicon atom
-  swaps places with its nearest neighbors.
-  """
-
-  def __call__(
-      self,
-      grid: microscope_utils.AtomicGridMaterialFrame,
-      beam_position: geometry.PointMaterialFrame,
-      silicon_position: np.ndarray,
-      neighbor_indices: np.ndarray,
-  ) -> np.ndarray:
-    ...
-
-
-@dataclasses.dataclass(frozen=True)
-class PristineSingleSiGrRatePredictor(RateFunction):
-  """A single silicon, pristine graphene rate predictor."""
-
-  canonical_rate_prediction_fn: CanonicalRatePredictionFn
-
-  def __call__(
-      self,
-      grid: microscope_utils.AtomicGridMaterialFrame,
-      beam_position: geometry.PointMaterialFrame,
-  ) -> Rates:
-    silicon_position = get_single_silicon_position(grid)
-
-    si_neighbor_indices = geometry.nearest_neighbors3(
-        grid.atom_positions, silicon_position
-    ).neighbor_indices
-    si_neighbor_indices = si_neighbor_indices.reshape(-1)
-
-    transition_rates = self.canonical_rate_prediction_fn(
-        grid,
-        beam_position,
-        silicon_position,
-        si_neighbor_indices,
-    )
-    transition_rates = np.asarray(transition_rates).astype(np.float32)
-
-    assert (transition_rates >= 0).all(), 'transition_rates were not positive.'
-    assert transition_rates.size == si_neighbor_indices.size
-
-    # Create successor grids associated with the rates.
-    atom_positions = grid.atom_positions  # Atom positions remain fixed.
-    successor_states = []
-    for next_si_idx, rate in zip(si_neighbor_indices, transition_rates):
-      atomic_numbers = np.full_like(grid.atomic_numbers, constants.CARBON)
-      atomic_numbers[next_si_idx] = constants.SILICON
-      successor_states.append(
-          SuccessorState(
-              microscope_utils.AtomicGridMaterialFrame(
-                  microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
-              ),
-              rate,
-          )
-      )
-
-    return Rates(successor_states)
 
 
 class PristineSingleDopedGraphene(Material):

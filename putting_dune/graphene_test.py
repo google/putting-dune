@@ -309,6 +309,26 @@ class GrapheneTest(absltest.TestCase):
 
     material.apply_control(self.rng, _ARBITRARY_CONTROL)
 
+  def test_gaussian_mixture_rates_puts_max_value_at_loc(self):
+    # A rate function with a mode on the silicon atom, and a mode on the
+    # nighbor. The mode on the silicon atom has greater weight and lower
+    # variance, so it is the global max.
+    rate_fn = graphene.GaussianMixtureRateFunction(
+        max_rate=1.0,
+        mixture_weights=np.asarray((0.8, 0.2)),
+        loc_distances=np.asarray((0.0, 1.0)),
+        variances=np.asarray(((0.1, 0.1), (1.0, 1.0))),
+    )
+    grid = test_utils.create_single_silicon_pristine_sigr(self.rng)
+    # Add an offset to the grid, to ensure silicon is not at (0, 0).
+    offset = np.asarray([[1.0, 3.0]])
+    grid.atom_positions[:, :] += offset
+    si_pos = graphene.get_single_silicon_position(grid)
+    rates = rate_fn(grid, geometry.PointMaterialFrame(geometry.Point(si_pos)))
+
+    max_rate = max(x.rate for x in rates.successor_states)
+    self.assertAlmostEqual(max_rate, 1.0, places=1)
+
 
 class PristineSingleSiGrRatePredictorTest(absltest.TestCase):
 
