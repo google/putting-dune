@@ -61,7 +61,7 @@ class FeatureConstructor(abc.ABC):
 
 
 def _get_silicon_goal_delta(
-    grid: microscope_utils.AtomicGrid,
+    grid: microscope_utils.AtomicGridMicroscopeFrame,
     fov: microscope_utils.MicroscopeFieldOfView,
     goal: goals.SingleSiliconGoalReaching,
 ) -> np.ndarray:
@@ -76,10 +76,10 @@ def _get_silicon_goal_delta(
   return goal_delta_angstroms
 
 
-class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
+class SingleSiliconPristineGrapheneFeatureConstuctor(FeatureConstructor):
   """A feature constructor assuming pristine graphene with single dopant.
 
-  This goal used with this class must be SingleSiliconGoalReaching.
+  The goal used with this class must be SingleSiliconGoalReaching.
   """
 
   def reset(self) -> None:
@@ -137,6 +137,81 @@ class SingleSiliconPristineGraphineFeatureConstuctor(FeatureConstructor):
     obs = np.concatenate([
         silicon_position,
         normalized_deltas.reshape(-1),
+        goal_delta_angstroms,
+    ])
+
+    return obs.astype(np.float32)
+
+  def observation_spec(self) -> specs.Array:
+    # 2 for silicon position.
+    # 6 for 3 nearest neighbor delta vectors.
+    # 2 for goal delta.
+    return specs.Array((2 + 6 + 2,), np.float32)
+
+  @property
+  def requires_image(self) -> bool:
+    """Returns True if the feature constructor requires an image."""
+    return False
+
+
+class SingleSiliconMaterialFrameFeatureConstructor(FeatureConstructor):
+  """A feature constructor designed for agents that need material-frame inputs.
+
+  The goal used with this class must be SingleSiliconGoalReaching.
+  """
+
+  def reset(self) -> None:
+    pass
+
+  def get_features(
+      self,
+      observation: microscope_utils.MicroscopeObservation,
+      goal: goals.Goal,
+  ) -> np.ndarray:
+    """Gets features for an agent based on the osbervation and goal.
+
+    Args:
+      observation: The observation from the microscope.
+      goal: The current goal we are executing.
+
+    Returns:
+      A numpy feature vector.
+
+    Raises:
+      SiliconNotFoundError: if no silicon atom was found.
+    """
+    if not isinstance(goal, goals.SingleSiliconGoalReaching):
+      raise ValueError(
+          f'{self.__class__} only usable with goals.SingleSiliconGoalReaching.'
+          f' Got {goal.__class__}'
+      )
+    goal = typing.cast(goals.SingleSiliconGoalReaching, goal)
+    grid = observation.fov.microscope_frame_to_material_frame(observation.grid)
+
+    silicon_position = graphene.get_single_silicon_position(grid)
+
+    # Ensure the silicon position shape is correct.
+    silicon_position = silicon_position.reshape(2)
+
+    # Get the vectors to the nearest neighbors.
+    nearest_neighbors = neighbors.NearestNeighbors(
+        n_neighbors=1 + 3,
+        metric='l2',
+        algorithm='brute',
+    ).fit(grid.atom_positions)
+    neighbor_distances, neighbor_indices = nearest_neighbors.kneighbors(
+        silicon_position.reshape(1, 2)
+    )
+    neighbor_positions = grid.atom_positions[neighbor_indices[0, 1:]]
+    neighbor_deltas = neighbor_positions - silicon_position.reshape(1, 2)
+    neighbor_deltas = neighbor_distances[0, 1:].reshape(-1, 1)
+    goal_delta_angstroms = _get_silicon_goal_delta(
+        observation.grid, observation.fov, goal
+    )
+
+    obs = np.concatenate([
+        silicon_position,
+        neighbor_deltas.reshape(-1),
         goal_delta_angstroms,
     ])
 

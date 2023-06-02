@@ -31,7 +31,7 @@ class FeatureConstructorsTest(absltest.TestCase):
 
     goal = goals.SingleSiliconGoalReaching()
     goal.reset(rng, observation)
-    fc = feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor()
+    fc = feature_constructors.SingleSiliconPristineGrapheneFeatureConstuctor()
 
     features = fc.get_features(observation, goal)
 
@@ -43,7 +43,7 @@ class FeatureConstructorsTest(absltest.TestCase):
     observation = test_utils.create_single_silicon_observation(rng)
     goal = goals.SingleSiliconGoalReaching()
     goal.reset(rng, observation)
-    fc = feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor()
+    fc = feature_constructors.SingleSiliconPristineGrapheneFeatureConstuctor()
 
     # Make all atoms carbon to trigger the exception.
     observation.grid.atomic_numbers[:] = constants.CARBON

@@ -214,3 +214,57 @@ class RelativeToSiliconActionAdapter(ActionAdapter):
           minimum=np.asarray([-1.0, -1.0, 0.0]),
           maximum=np.asarray([1.0, 1.0, 1.0]),
       )
+
+
+class RelativeToSiliconMaterialFrameActionAdapter(
+    RelativeToSiliconActionAdapter
+):
+  """An action adapter that takes a relative position in Angstroms to a silicon.
+
+  Input actions are a delta vector from the silicon, specified in Angstroms.
+  """
+
+  def get_action(
+      self,
+      previous_observation: microscope_utils.MicroscopeObservation,
+      action: np.ndarray,
+  ) -> List[microscope_utils.BeamControlMicroscopeFrame]:
+    """Gets simulator controls from the agent action."""
+    relative_position_angstroms = action[:2]
+
+    silicon_position = graphene.get_silicon_positions(previous_observation.grid)
+
+    if silicon_position.shape != (1, 2):
+      raise RuntimeError(
+          'Expected to find one silicon with x, y coordinates. Instead, '
+          f'got {silicon_position.shape[0]} silicon atoms with '
+          f'{silicon_position.shape[1]} dimensions.'
+      )
+    silicon_position = np.reshape(silicon_position, (2,))
+
+    # Action is [dx, dy] in angstroms
+    relative_position_microscope = (
+        previous_observation.fov.material_frame_to_microscope_frame(
+            relative_position_angstroms
+        )
+    )
+    control_position = silicon_position + relative_position_microscope
+    control_position = np.clip(control_position, 0.0, 1.0)
+
+    if self._fixed_dwell_time:
+      dwell_time = dt.timedelta(seconds=self._min_dwell_seconds)
+    else:
+      dwell_time_action = np.clip(action[2], 0.0, 1.0)
+      dwell_range_seconds = self._max_dwell_seconds - self._min_dwell_seconds
+      dwell_time_seconds = (
+          dwell_time_action * dwell_range_seconds + self._min_dwell_seconds
+      )
+      dwell_time = dt.timedelta(seconds=dwell_time_seconds)
+
+    return [
+        microscope_utils.BeamControlMicroscopeFrame(
+            microscope_utils.BeamControl(
+                geometry.Point(*control_position), dwell_time
+            )
+        )
+    ]

@@ -48,6 +48,25 @@ def _get_relative_random_agent(
   )
 
 
+def _get_greedy_agent(
+    rng: np.random.Generator,
+    adapters_and_goal: experiments.AdaptersAndGoal,
+    argmax=np.asarray([1.42, 0.0]),
+    transition_function=None,
+    fixed_offset=np.zeros(
+        2,
+    ),
+) -> agent_lib.GreedyAgent:
+  return agent_lib.GreedyAgent(
+      rng=rng,
+      argmax=argmax,
+      transition_function=transition_function,
+      fixed_offset=fixed_offset,
+      low=adapters_and_goal.action_adapter.action_spec.minimum,
+      high=adapters_and_goal.action_adapter.action_spec.maximum,
+  )
+
+
 @dataclasses.dataclass(frozen=True)
 class _TfAgentCreator:
   """Gets a tf eval agent, loading from the specified path."""
@@ -163,7 +182,26 @@ class _SingleSiliconGoalReaching:
             dwell_time_range=self.dwell_time_range,
             max_distance_angstroms=self.max_distance_angstroms,
         ),
-        feature_constructor=feature_constructors.SingleSiliconPristineGraphineFeatureConstuctor(),
+        feature_constructor=feature_constructors.SingleSiliconPristineGrapheneFeatureConstuctor(),
+        goal=goals.SingleSiliconGoalReaching(),
+    )
+
+
+@dataclasses.dataclass(frozen=True)
+class _SingleSiliconGoalReachingMaterialFrame:
+  dwell_time_range: Tuple[dt.timedelta, dt.timedelta] = (
+      dt.timedelta(seconds=1.5),
+      dt.timedelta(seconds=1.5),
+  )
+  max_distance_angstroms: float = constants.CARBON_BOND_DISTANCE_ANGSTROMS * 2.0
+
+  def __call__(self) -> experiments.AdaptersAndGoal:
+    return experiments.AdaptersAndGoal(
+        action_adapter=action_adapters.RelativeToSiliconMaterialFrameActionAdapter(
+            dwell_time_range=self.dwell_time_range,
+            max_distance_angstroms=self.max_distance_angstroms,
+        ),
+        feature_constructor=feature_constructors.SingleSiliconMaterialFrameFeatureConstructor(),
         goal=goals.SingleSiliconGoalReaching(),
     )
 
@@ -243,6 +281,16 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
                 dt.timedelta(seconds=5.0),
             ),
             max_distance_angstroms=3 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ),
+    ),
+    'greedy_simple': experiments.MicroscopeExperiment(
+        get_agent=_get_greedy_agent,
+        get_adapters_and_goal=_SingleSiliconGoalReachingMaterialFrame(
+            dwell_time_range=(
+                dt.timedelta(seconds=5.0),
+                dt.timedelta(seconds=5.0),
+            ),
+            max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
         ),
     ),
     'ppo_simple_images_tf': experiments.MicroscopeExperiment(
