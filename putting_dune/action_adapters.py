@@ -241,14 +241,18 @@ class RelativeToSiliconMaterialFrameActionAdapter(
           f'{silicon_position.shape[1]} dimensions.'
       )
     silicon_position = np.reshape(silicon_position, (2,))
-
-    # Action is [dx, dy] in angstroms
-    relative_position_microscope = (
-        previous_observation.fov.material_frame_to_microscope_frame(
-            relative_position_angstroms
+    silicon_position_material = (
+        previous_observation.fov.microscope_frame_to_material_frame(
+            silicon_position
         )
     )
-    control_position = silicon_position + relative_position_microscope
+
+    # Action is [dx, dy] in angstroms
+    control_position = (
+        previous_observation.fov.material_frame_to_microscope_frame(
+            silicon_position_material + relative_position_angstroms
+        )
+    )
     control_position = np.clip(control_position, 0.0, 1.0)
 
     if self._fixed_dwell_time:

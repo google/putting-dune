@@ -185,6 +185,47 @@ class ActionAdaptersTest(parameterized.TestCase):
         expected_position,
     )
 
+  def test_material_relative_adapter_has_acceptable_action_spec(self) -> None:
+    action_adapter = (
+        action_adapters.RelativeToSiliconMaterialFrameActionAdapter()
+    )
+    action_adapter.reset()
+
+    sampled_action = action_adapter.action_spec.generate_value()
+    simulator_controls = action_adapter.get_action(
+        test_utils.create_single_silicon_observation(self.rng),
+        sampled_action,
+    )
+
+    self.assertLen(simulator_controls, 1)
+    self.assertIsInstance(simulator_controls[0], microscope_utils.BeamControl)
+
+  def test_material_relative_adapter_changes_beam_position_in_angstroms(self):
+    action_adapter = (
+        action_adapters.RelativeToSiliconMaterialFrameActionAdapter()
+    )
+    action_adapter.reset()
+
+    # Relative position in angstroms
+    action_in_angstroms = np.asarray([1.0, 0.0], dtype=np.float32)
+    observation = test_utils.create_single_silicon_observation(self.rng)
+
+    # We have to derive the silicon position in angstroms to calculate
+    # our new position
+    silicon_position = graphene.get_silicon_positions(
+        observation.grid
+    ).reshape((2,))
+    silicon_material_position = (
+        observation.fov.microscope_frame_to_material_frame(silicon_position)
+    )
+    new_beam_position = observation.fov.material_frame_to_microscope_frame(
+        silicon_material_position + action_in_angstroms
+    )
+
+    control = action_adapter.get_action(observation, action_in_angstroms)
+    self.assertLen(control, 1)
+    np.testing.assert_equal(np.asarray(control[0].position), new_beam_position)
+
   def test_relative_adapter_has_acceptable_action_spec(self) -> None:
     action_adapter = action_adapters.RelativeToSiliconActionAdapter()
     action_adapter.reset()
