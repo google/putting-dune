@@ -16,6 +16,7 @@
 
 import dataclasses
 import datetime as dt
+import functools
 from typing import Callable, Optional, Tuple
 import urllib.request
 import zipfile
@@ -283,8 +284,59 @@ _MICROSCOPE_EXPERIMENTS = frozendict.frozendict({
             max_distance_angstroms=3 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
         ),
     ),
-    'greedy_simple': experiments.MicroscopeExperiment(
-        get_agent=_get_greedy_agent,
+    'greedy_on_neighbor': experiments.MicroscopeExperiment(
+        get_agent=functools.partial(
+            _get_greedy_agent, argmax=np.array([1.42, 0.0])
+        ),
+        get_adapters_and_goal=_SingleSiliconGoalReachingMaterialFrame(
+            dwell_time_range=(
+                dt.timedelta(seconds=5.0),
+                dt.timedelta(seconds=5.0),
+            ),
+            max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ),
+    ),
+    'greedy_short_of_neighbor': experiments.MicroscopeExperiment(
+        get_agent=functools.partial(
+            _get_greedy_agent, argmax=np.array([0.58, 0.0])
+        ),
+        get_adapters_and_goal=_SingleSiliconGoalReachingMaterialFrame(
+            dwell_time_range=(
+                dt.timedelta(seconds=5.0),
+                dt.timedelta(seconds=5.0),
+            ),
+            max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ),
+    ),
+    'greedy_on_neighbor_offset_horizontally': experiments.MicroscopeExperiment(
+        get_agent=functools.partial(
+            _get_greedy_agent, argmax=np.array([1.42, 0.42])
+        ),
+        get_adapters_and_goal=_SingleSiliconGoalReachingMaterialFrame(
+            dwell_time_range=(
+                dt.timedelta(seconds=5.0),
+                dt.timedelta(seconds=5.0),
+            ),
+            max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ),
+    ),
+    'greedy_from_learned_rates_v3': experiments.MicroscopeExperiment(
+        get_agent=functools.partial(
+            _get_greedy_agent, argmax=np.array([1.8686869, 0.0])
+        ),
+        get_adapters_and_goal=_SingleSiliconGoalReachingMaterialFrame(
+            dwell_time_range=(
+                dt.timedelta(seconds=5.0),
+                dt.timedelta(seconds=5.0),
+            ),
+            max_distance_angstroms=2 * constants.CARBON_BOND_DISTANCE_ANGSTROMS,
+        ),
+    ),
+    'greedy_from_learned_rates_v5': experiments.MicroscopeExperiment(
+        get_agent=functools.partial(
+            _get_greedy_agent,
+            argmax=np.array([2.1717172, -0.15151516]),
+        ),
         get_adapters_and_goal=_SingleSiliconGoalReachingMaterialFrame(
             dwell_time_range=(
                 dt.timedelta(seconds=5.0),
