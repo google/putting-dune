@@ -38,6 +38,19 @@ class FeatureConstructorsTest(absltest.TestCase):
     self.assertIsInstance(features, np.ndarray)
     self.assertEqual(features.shape, fc.observation_spec().shape)
 
+  def test_material_frame_feature_constructor_returns_valid_features(self):
+    rng = np.random.default_rng(0)
+    observation = test_utils.create_single_silicon_observation(rng)
+
+    goal = goals.SingleSiliconGoalReaching()
+    goal.reset(rng, observation)
+    fc = feature_constructors.SingleSiliconMaterialFrameFeatureConstructor()
+
+    features = fc.get_features(observation, goal)
+
+    self.assertIsInstance(features, np.ndarray)
+    self.assertEqual(features.shape, fc.observation_spec().shape)
+
   def test_pristine_graphene_constructor_raises_error_with_no_silicon(self):
     rng = np.random.default_rng(0)
     observation = test_utils.create_single_silicon_observation(rng)

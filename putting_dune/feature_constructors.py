@@ -199,12 +199,11 @@ class SingleSiliconMaterialFrameFeatureConstructor(FeatureConstructor):
         metric='l2',
         algorithm='brute',
     ).fit(grid.atom_positions)
-    neighbor_distances, neighbor_indices = nearest_neighbors.kneighbors(
+    _, neighbor_indices = nearest_neighbors.kneighbors(
         silicon_position.reshape(1, 2)
     )
     neighbor_positions = grid.atom_positions[neighbor_indices[0, 1:]]
     neighbor_deltas = neighbor_positions - silicon_position.reshape(1, 2)
-    neighbor_deltas = neighbor_distances[0, 1:].reshape(-1, 1)
     goal_delta_angstroms = _get_silicon_goal_delta(
         observation.grid, observation.fov, goal
     )
