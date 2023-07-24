@@ -15,11 +15,15 @@
 """Tests for microscope_agent."""
 
 import datetime as dt
+import typing
 from unittest import mock
 
 from absl.testing import absltest
+from etils import epath
 import numpy as np
+import pandas as pd
 from putting_dune import constants
+from putting_dune import io as pdio
 from putting_dune import microscope_agent
 from putting_dune import microscope_utils
 from putting_dune import test_utils
@@ -99,6 +103,47 @@ class MicroscopeAgentTest(absltest.TestCase):
     self.assertIsInstance(controls, list)
     self.assertLen(controls, 1)
     self.assertEqual(controls[0].dwell_time, dt.timedelta(seconds=0))
+
+  def test_microscope_agent_logs_data(self):
+    rng = np.random.default_rng(0)
+    experiment = registry.create_microscope_experiment('relative_random')
+
+    path = epath.Path(self.create_tempdir().full_path)
+    agent = microscope_agent.MicroscopeAgent(rng, experiment)
+    with microscope_agent.MicroscopeAgentLogger(agent, logdir=path) as agent:
+      agent.reset(rng, test_utils.create_single_silicon_observation(rng))
+      for _ in range(2):
+        agent.step(test_utils.create_single_silicon_observation(rng))
+      agent.reset(rng, test_utils.create_single_silicon_observation(rng))
+      for _ in range(3):
+        agent.step(test_utils.create_single_silicon_observation(rng))
+
+    self.assertTrue((path / 'steps.csv').exists())
+    steps_df = pd.read_csv((path / 'steps.csv').as_posix())
+    self.assertEqual(
+        steps_df.shape,
+        (5, len(typing.get_type_hints(microscope_agent.StepRecord).keys())),
+        f'{steps_df!r}',
+    )
+
+    self.assertTrue((path / 'episodes.csv').exists())
+    episodes_df = pd.read_csv((path / 'episodes.csv').as_posix())
+    self.assertEqual(
+        episodes_df.shape,
+        (2, len(typing.get_type_hints(microscope_agent.EpisodeRecord).keys())),
+        f'{episodes_df!r}',
+    )
+
+    trajectory_lengths = [2, 3]
+    self.assertTrue((path / 'trajectories.tfrecords').exists())
+    for trajectory, trajectory_length in zip(
+        pdio.read_records(
+            path / 'trajectories.tfrecords',
+            microscope_utils.Trajectory,
+        ),
+        trajectory_lengths,
+    ):
+      self.assertLen(trajectory.observations, trajectory_length)
 
 
 if __name__ == '__main__':

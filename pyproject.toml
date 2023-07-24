@@ -29,6 +29,7 @@ dependencies = [
     "scikit-learn",
     "tensorflow",
     "shapely",
+    "wrapt",
 ]
 
 # This is set automatically by flit using `putting_dune.__version__`

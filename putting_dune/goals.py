@@ -19,6 +19,7 @@ import dataclasses
 
 import numpy as np
 from putting_dune import constants
+from putting_dune import geometry
 from putting_dune import graphene
 from putting_dune import microscope_utils
 
@@ -118,6 +119,13 @@ class SingleSiliconGoalReaching(Goal):
         )
     )
     self._consecutive_goal_steps = 0
+
+  @property
+  def current_goal(self) -> geometry.Point:
+    return geometry.Point(
+        self.goal_position_material_frame[0],
+        self.goal_position_material_frame[1],
+    )
 
   def calculate_reward_and_terminal(
       self,
