@@ -18,6 +18,7 @@ import collections
 import copy
 import functools
 import io
+import typing
 from typing import Any, Deque, Optional, Sequence, Tuple
 import urllib
 import zipfile
@@ -564,7 +565,10 @@ class ImageAligner:
       try:
         shifted_fov = fov.shift(geometry.Point(*-pred_drift))
         material_grid = shifted_fov.microscope_frame_to_material_frame(grid)
-        postprocessed_grid, postprocessed_drift = self.postprocessing_aligner(
+        postprocessing_aligner = typing.cast(
+            IterativeAlignmentFiltering, self.postprocessing_aligner
+        )
+        postprocessed_grid, postprocessed_drift = postprocessing_aligner(
             material_grid
         )
         pred_drift = pred_drift + postprocessed_drift

@@ -13,12 +13,15 @@
 # limitations under the License.
 
 """Common utilities for microscope components."""
+# pylint: disable=arguments-renamed
+# pylint: disable=invalid-name
 
+import abc
 import dataclasses
 import datetime as dt
 import typing
-from typing import NewType, Optional, Sequence, Tuple
-
+from typing import ClassVar, Generic, NewType, Optional, Sequence, Tuple, Type, TypeVar
+from google.protobuf import message as message_pb2
 import numpy as np
 from putting_dune import geometry
 from putting_dune import putting_dune_pb2
@@ -38,9 +41,41 @@ def proto_point_to_shapely_point(
   return geometry.Point((point.x, point.y))
 
 
+ProtoMessageT = TypeVar('ProtoMessageT', bound=message_pb2.Message)
+
+
+class ProtoModel(abc.ABC, Generic[ProtoMessageT]):
+  """A protobuf backed model."""
+
+  ProtoMessage: ClassVar[Type[ProtoMessageT]]
+
+  def __init_subclass__(cls, *args, **kwargs):
+    super().__init_subclass__(*args, **kwargs)
+
+    if getattr(cls, 'ProtoMessage', None) is None:
+      raise NotImplementedError('ProtoMessage not implemented on a ProtoModel')
+
+  @classmethod
+  def from_proto_string(cls, string: str) -> 'ProtoModel[ProtoMessageT]':
+    return cls.from_proto(cls.ProtoMessage.FromString(string))
+
+  @classmethod
+  @abc.abstractmethod
+  def from_proto(cls, message: ProtoMessageT) -> 'ProtoModel[ProtoMessageT]':
+    ...
+
+  @abc.abstractmethod
+  def to_proto(self) -> ProtoMessageT:
+    ...
+
+
 @dataclasses.dataclass(frozen=True)
-class AtomicGrid:
+class AtomicGrid(ProtoModel[putting_dune_pb2.AtomicGrid]):
   """A grid of atoms."""
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.AtomicGrid]] = (
+      putting_dune_pb2.AtomicGrid
+  )
 
   atom_positions: np.ndarray
   atomic_numbers: np.ndarray
@@ -143,7 +178,7 @@ AtomicGridMicroscopeFrame = NewType('AtomicGridMicroscopeFrame', AtomicGrid)
 
 
 @dataclasses.dataclass(frozen=True)
-class BeamControl:
+class BeamControl(ProtoModel[putting_dune_pb2.BeamControl]):
   """Specifications to control the microscope beam for one step.
 
   Attributes:
@@ -152,6 +187,10 @@ class BeamControl:
     voltage_kv: Beam voltage, in kilovolts.
     current_na: Beam current, in nanoamperes
   """
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.BeamControl]] = (
+      putting_dune_pb2.BeamControl
+  )
 
   position: geometry.Point
   dwell_time: dt.timedelta
@@ -194,7 +233,7 @@ BeamControlMicroscopeFrame = NewType('BeamControlMicroscopeFrame', BeamControl)
 
 
 @dataclasses.dataclass(frozen=True)
-class MicroscopeFieldOfView:
+class MicroscopeFieldOfView(ProtoModel[putting_dune_pb2.FieldOfView]):
   """A class that tracks where the microscope is scanning at any given time.
 
   Agents interact with the microscope by specifying controls in the
@@ -204,6 +243,10 @@ class MicroscopeFieldOfView:
   beyond the field of view of the microscope. Thus, this class also
   contains convenience functions for moving between these coordinate spaces.
   """
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.FieldOfView]] = (
+      putting_dune_pb2.FieldOfView
+  )
 
   lower_left: geometry.PointMaterialFrame
   upper_right: geometry.PointMaterialFrame
@@ -490,8 +533,12 @@ class SimulatorObserver:
 
 
 @dataclasses.dataclass(frozen=True)
-class MicroscopeObservation:
+class MicroscopeObservation(ProtoModel[putting_dune_pb2.MicroscopeObservation]):
   """An observation from interacting with a microscope."""
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.MicroscopeObservation]] = (
+      putting_dune_pb2.MicroscopeObservation
+  )
 
   grid: AtomicGridMicroscopeFrame
   fov: MicroscopeFieldOfView
@@ -555,7 +602,7 @@ class MicroscopeObservation:
 
 
 @dataclasses.dataclass(frozen=True)
-class Transition:
+class Transition(ProtoModel[putting_dune_pb2.Transition]):
   """A single transition from a microscope.
 
   Attributes:
@@ -569,6 +616,10 @@ class Transition:
     label_image_before: Labeled image before the transition (optional).
     label_image_after: Labeled image after the transition (optional).
   """
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.Transition]] = (
+      putting_dune_pb2.Transition
+  )
 
   grid_before: AtomicGridMicroscopeFrame
   grid_after: AtomicGridMicroscopeFrame
@@ -670,12 +721,16 @@ class Transition:
 
 
 @dataclasses.dataclass(frozen=True)
-class Trajectory:
+class Trajectory(ProtoModel[putting_dune_pb2.Trajectory]):
   """A trajectory of observations from a microscope.
 
   Attributes:
     observations: Sequence of MicroscopeObservations
   """
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.Trajectory]] = (
+      putting_dune_pb2.Trajectory
+  )
 
   observations: Sequence[MicroscopeObservation]
 
@@ -700,13 +755,15 @@ class Trajectory:
 
 
 @dataclasses.dataclass(frozen=True)
-class Drift:
+class Drift(ProtoModel[putting_dune_pb2.Drift]):
   """A trajectory of observations from a microscope.
 
   Attributes:
     drift: A shared (2,) drift vector applying to an entire material.
     jitter: A (num_atoms, 2) array of per-atom displacements.
   """
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.Drift]] = putting_dune_pb2.Drift
 
   jitter: np.ndarray
   drift: np.ndarray
@@ -776,13 +833,19 @@ class Drift:
 
 
 @dataclasses.dataclass(frozen=True)
-class LabeledAlignmentTrajectory:
+class LabeledAlignmentTrajectory(
+    ProtoModel[putting_dune_pb2.LabeledAlignmentTrajectory]
+):
   """A trajectory of observations from a microscope, with accompanying drifts.
 
   Attributes:
     trajectory: a Trajectory object.
     drifts: a sequence of Drift objects.
   """
+
+  ProtoMessage: ClassVar[Type[putting_dune_pb2.LabeledAlignmentTrajectory]] = (
+      putting_dune_pb2.LabeledAlignmentTrajectory
+  )
 
   trajectory: Trajectory
   drifts: Sequence[Drift]
