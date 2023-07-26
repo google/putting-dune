@@ -1,4 +1,4 @@
-# Copyright 2023 The Putting Dune Authors.
+# Copyright 2024 The Putting Dune Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ from typing import Any, List, Tuple
 import urllib
 import zipfile
 
-import cv2
+from cvx2 import latest as cv2
 from etils import epath
 import numpy as np
 import numpy.typing as npt

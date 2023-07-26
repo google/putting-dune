@@ -1,4 +1,4 @@
-# Copyright 2023 The Putting Dune Authors.
+# Copyright 2024 The Putting Dune Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import abc
 import typing
 from typing import Dict, Union
 
-import cv2
+from cvx2 import latest as cv2
 from dm_env import specs
 import numpy as np
 from putting_dune import goals

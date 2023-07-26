@@ -1,4 +1,4 @@
-# Copyright 2023 The Putting Dune Authors.
+# Copyright 2024 The Putting Dune Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -418,12 +418,11 @@ class GaussianMixtureRateFunction(RateFunction):
     input_file = path / 'gmm_parameters.mpk'
     bundle = msgpack.unpackb(input_file.read_bytes())
 
-    # Note: msgpack turns strings into byte strings by default.
     return cls(
-        max_rate=bundle[b'max_rate'],
-        mixture_weights=bundle[b'mixture_weights'],
-        loc_distances=bundle[b'loc_distances'],
-        variances=bundle[b'variances'],
+        max_rate=bundle['max_rate'],
+        mixture_weights=bundle['mixture_weights'],
+        loc_distances=bundle['loc_distances'],
+        variances=bundle['variances'],
     )
 
   @classmethod
