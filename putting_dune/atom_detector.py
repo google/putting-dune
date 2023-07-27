@@ -20,7 +20,7 @@ from typing import Any, List, Tuple
 import urllib
 import zipfile
 
-from cvx2 import latest as cv2
+import cv2
 from etils import epath
 import numpy as np
 import numpy.typing as npt
@@ -57,7 +57,7 @@ def compute_centroids(
   _, dists = cv2.threshold(dists, threshold_value, 255, cv2.THRESH_BINARY)
 
   # Detect contours from the distance transform
-  contours, *_ = cv2.findContours(dists, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+  contours, *_ = cv2.findContours(dists, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
   # Compute centroids
   # Repurposed from:

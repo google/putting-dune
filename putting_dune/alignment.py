@@ -23,7 +23,7 @@ from typing import Any, Deque, Optional, Sequence, Tuple
 import urllib
 import zipfile
 
-from cvx2 import latest as cv2
+import cv2
 from etils import epath
 import networkx as nx
 import numpy as np
@@ -385,8 +385,8 @@ class ImageAligner:
     mask = (mask * 255).astype(np.uint8)
     if erode_iters:
       mask = cv2.erode(mask, np.ones((2, 2)), iterations=erode_iters)
-    _, contours, _ = cv2.findContours(
-        mask, cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE
+    contours, _ = cv2.findContours(
+        mask, cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE
     )
 
     centroids = []

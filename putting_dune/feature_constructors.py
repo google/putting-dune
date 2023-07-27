@@ -18,7 +18,7 @@ import abc
 import typing
 from typing import Dict, Union
 
-from cvx2 import latest as cv2
+import cv2
 from dm_env import specs
 import numpy as np
 from putting_dune import goals
