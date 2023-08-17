@@ -94,7 +94,7 @@ def save(config: Config):
 
   best_step = chkpt_manager.best_step()
   restored = chkpt_manager.restore(best_step)
-  state = TrainState(**restored, apply_fn=model.apply, tx=None)
+  state = TrainState(**restored, apply_fn=model.apply, tx=None)  # pytype: disable=wrong-arg-types  # dataclass_transform
 
   def remove_value_layer(param_dict):
     if isinstance(param_dict, dict):
