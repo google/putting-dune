@@ -50,7 +50,7 @@ class GeometryTest(absltest.TestCase):
     coordinates = jnp.asarray([[1.0, 0.0], [0.0, -1.0], [-1.0, -1.0]])
     expected_coordinates = jnp.asarray([[0.0, 1.0], [1.0, 0.0], [1.0, -1.0]])
 
-    rotated_coordinates = geometry.jnp_rotate_coordinates(
+    rotated_coordinates = geometry.jnp_rotate_coordinates(  # pytype: disable=wrong-arg-types  # jnp-type
         coordinates, jnp.pi / 2
     )
 

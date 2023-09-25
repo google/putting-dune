@@ -249,7 +249,7 @@ def generate_synthetic_data(
         constants.SIGR_PRIOR_RATE_COV * 1.5,
     )
     context = jax.random.normal(context_key, shape=(context_dim,))
-    rates = graphene.single_silicon_prior_rates(
+    rates = graphene.single_silicon_prior_rates(  # pytype: disable=wrong-arg-types  # jnp-type
         get_all_position_rotations(position, num_states=num_states),
         mean=constants.SIGR_PRIOR_RATE_MEAN,
         cov=constants.SIGR_PRIOR_RATE_COV,

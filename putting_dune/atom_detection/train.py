@@ -98,7 +98,7 @@ def train_step(
         jnp.argmax(logits, axis=-1) == jnp.argmax(batch['mask'], axis=-1)
     )
 
-    return loss, {'accuracy': accuracy, 'loss': loss}
+    return loss, {'accuracy': accuracy, 'loss': loss}  # pytype: disable=bad-return-type  # jnp-type
 
   grads, infos = grad_fn(state.params)
   metrics = state.metrics.merge(state.metrics.single_from_model_output(**infos))

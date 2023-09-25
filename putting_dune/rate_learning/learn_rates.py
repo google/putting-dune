@@ -467,7 +467,7 @@ def distill_train_epoch(
       distill_train_step, (params, network_state, opt_state), keys
   )
 
-  return params, network_state, opt_state, keys[-1], jnp.mean(losses)
+  return params, network_state, opt_state, keys[-1], jnp.mean(losses)  # pytype: disable=bad-return-type  # jnp-type
 
 
 def distill_multiple_models_to_single(

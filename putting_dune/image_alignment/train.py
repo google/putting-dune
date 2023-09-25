@@ -149,7 +149,7 @@ def train_step(
         'final_step_drift_loss': final_drift_loss,
         'final_step_drift_error': final_drift_error,
     }
-    return total_loss, metric_dict
+    return total_loss, metric_dict  # pytype: disable=bad-return-type  # jnp-type
 
   grads, infos = grad_fn(state.params)
   infos = state.metrics.single_from_model_output(**infos)
