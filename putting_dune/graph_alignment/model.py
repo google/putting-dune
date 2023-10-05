@@ -223,7 +223,7 @@ def create_sparse_neighbor_list(
   """
   idx_matrix = jnp.zeros((2, capacity), jnp.int32)
   overflow = jnp.zeros((), dtype=jnp.bool_)
-  neighbor_list = partition.NeighborList(  # pytype: disable=wrong-arg-count
+  neighbor_list = partition.NeighborList(  # type: ignore
       idx_matrix,
       initial_position,
       overflow,
