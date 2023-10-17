@@ -500,6 +500,35 @@ def _generate_hexagonal_grid(num_cols: int = 50) -> np.ndarray:
   return np.stack((coord_x, coord_y), axis=1)
 
 
+def canonical_pristine_graphene_with_centered_silicon(
+    num_columns: int = 10,
+) -> microscope_utils.AtomicGridMaterialFrame:
+  """Generate a canonical pristine graphene sheet."""
+  atom_positions = _generate_hexagonal_grid(num_columns)
+  atom_positions *= constants.CARBON_BOND_DISTANCE_ANGSTROMS
+  atom_positions -= np.mean(atom_positions, axis=0, keepdims=True)
+
+  rotation_angle = 0
+  rotation_angle_rad = np.deg2rad(rotation_angle)
+  rotation_matrix = np.asarray([
+      [np.cos(rotation_angle_rad), -np.sin(rotation_angle_rad)],
+      [np.sin(rotation_angle_rad), np.cos(rotation_angle_rad)],
+  ])
+  atom_positions @= rotation_matrix
+
+  atomic_numbers = np.full((atom_positions.shape[0],), constants.CARBON)
+
+  si_idx = np.argmin(np.sum(atom_positions**2, axis=1))  # Nearest (0, 0)
+  atomic_numbers[si_idx] = constants.SILICON
+
+  # Center silicon on (0, 0)
+  atom_positions -= atom_positions[si_idx].reshape(1, -1)
+
+  return microscope_utils.AtomicGridMaterialFrame(  # pylint: disable=no-value-for-parameter
+      microscope_utils.AtomicGrid(atom_positions, atomic_numbers)
+  )
+
+
 def generate_pristine_graphene(
     rng: np.random.Generator, num_columns: int = 50
 ) -> np.ndarray:
