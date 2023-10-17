@@ -853,7 +853,7 @@ class LearnedTransitionRatePredictor:
     )
 
     config_path = epath.Path(os.path.join(save_dir, 'config.json'))
-    json_str = self.config.to_json()
+    json_str = self.config.to_json_best_effort()
     config_path.write_text(json_str)
 
   def load(
@@ -900,9 +900,7 @@ class LearnedTransitionRatePredictor:
       rates, _ = self.batch_apply(
           self.params, self.state, context, self.rng, False
       )
-      total_rate = rates[..., -1:]
-      weights = jax.nn.softmax(rates[..., :-1], axis=-1)
-      return (total_rate * weights).mean(0)
+      return jnp.squeeze(rates, axis=0)
 
     apply_model = functools.partial(apply_model, fixed_context=fixed_context)
     apply_model = jax.jit(apply_model)
