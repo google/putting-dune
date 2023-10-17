@@ -18,6 +18,7 @@ import abc
 import dataclasses
 import datetime as dt
 import functools
+import os
 import pathlib
 from typing import Iterable, Protocol, Sequence
 
@@ -409,7 +410,7 @@ class GaussianMixtureRateFunction(RateFunction):
 
   @classmethod
   def deserialize_from_directory(
-      cls, load_dir: pathlib.Path | str, /
+      cls, load_dir: os.PathLike[str] | str, /
   ) -> 'GaussianMixtureRateFunction':
     """Deserializes a rate function from a specified directory."""
     logging.info('Deserializing %s from %s', cls.__name__, str(load_dir))
