@@ -16,9 +16,10 @@ r"""A script for training rates from real data for use in KMC.
 
 """
 
-import collections
+import collections.abc
 import dataclasses
 import enum
+import io
 import os
 from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple, TypedDict, Union
 
@@ -518,6 +519,8 @@ def stack_data(
     use_current: bool = False,
     use_voltage: bool = False,
     dwell_time_in_context: bool = False,
+    *,
+    num_neighbors: int = 3,
 ) -> Dataset:
   """Stack a list of datapoints into a single dataset for rate learning.
 
@@ -526,6 +529,7 @@ def stack_data(
     use_current: Bool, whether currents should be added to the context vector.
     use_voltage: Bool, whether voltage should be added to the context vector.
     dwell_time_in_context: Bool, whether dwell time should be added to context.
+    num_neighbors: int, the number of neighbors, default 3 for 3-fold.
 
   Returns:
     Single Dataset that can be passed to a rate learner.
@@ -533,7 +537,7 @@ def stack_data(
   beam_positions = np.stack([d['beam_pos'] for d in data])
   next_states = np.stack([d['next_state'] for d in data])
   dts = np.stack([d['seconds_between'] for d in data])
-  rates = np.zeros((next_states.shape[0], next_states.max()))
+  rates = np.zeros((next_states.shape[0], num_neighbors))
 
   context = []
   if use_current:
@@ -581,6 +585,8 @@ def visualize_data(
   for i in range(num_states + 1):
     mask = next_states == i
     local_positions = positions[mask]
+    if local_positions.size == 0:
+      continue
 
     label: str = ''
     if i == 0:
@@ -632,7 +638,7 @@ def load_trajectories_from_records(
     List of loaded trajectories.
   """
   trajectories = []
-  if isinstance(path, collections.Sequence):
+  if isinstance(path, collections.abc.Sequence):
     files = path
   elif path.is_dir():
     files = path.iterdir()
@@ -669,6 +675,8 @@ def main(args: Args) -> None:
       dwell_time_in_context=args.learner_type != LearnerType.RATE_NETWORK,
   )
 
+  rng_key = jax.random.PRNGKey(args.seed)
+
   if args.learner_type != LearnerType.RATE_NETWORK:
     # for any model implementing rate-based transitions, setting the dt field
     # to a constant 1 will cause a shift to regular classification.
@@ -698,24 +706,29 @@ def main(args: Args) -> None:
       args.learner_type == LearnerType.RATE_NETWORK
       or args.learner_type == LearnerType.CLASSIFICATION_NETWORK
   ):
+    rate_predictor_keys = jax.random.split(rng_key)
     rate_predictor = learn_rates.LearnedTransitionRatePredictor(
         num_states=3,
-        init_key=jax.random.PRNGKey(args.seed),
+        init_key=rate_predictor_keys[0],
         config=frozen_config,
     )
 
     training_metrics = rate_predictor.train(
         {k: jnp.asarray(v) for k, v in stacked_data.items()},
-        jax.random.PRNGKey(args.seed),
+        rate_predictor_keys[1],
+        bootstrap=args.bootstrap,
     )
 
     if args.log_metrics:
       path = epath.Path(os.path.join(args.workdir, 'metrics.npz'))
       with path.open('wb') as file:
-        np.savez_compressed(file, **training_metrics)
+        metrics_buffer = io.BytesIO()
+        np.savez_compressed(metrics_buffer, **training_metrics)
+        file.write(metrics_buffer.getvalue())
 
     if args.plot_metrics:
       for k, v in training_metrics.items():
+        plt.figure()
         for i in range(v.shape[0]):
           plt.plot(v[i][0:])
 
@@ -729,6 +742,7 @@ def main(args: Args) -> None:
         plot_path = os.path.join(args.workdir, f'{k}.png')
         with epath.Path(plot_path).open('wb') as f:
           plt.savefig(f, bbox_inches='tight')
+        plt.clf()
 
     if args.distill:
       distillation_defaults = config_dict.FrozenConfigDict({
@@ -748,7 +762,7 @@ def main(args: Args) -> None:
     train_datasets, test_datasets = learn_rates.create_dataset_splits(
         {k: jnp.asarray(v) for k, v in stacked_data.items()},
         num_splits=args.num_models,
-        key=jax.random.PRNGKey(args.seed),
+        key=rng_key,
         bootstrap=args.bootstrap,
         augment_data=args.augment_data,
         test_fraction=args.val_frac,
