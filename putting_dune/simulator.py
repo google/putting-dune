@@ -83,6 +83,7 @@ class PuttingDuneSimulator:
 
     for observer in self._observers:
       observer.observe_reset(self.material.grid, self._fov)
+      observer.observe_fov_change(self._fov)
 
     observed_grid, elapsed_time = self._get_observed_grid_and_elapsed_time()
 
@@ -162,6 +163,8 @@ class PuttingDuneSimulator:
           geometry.Point(silicon_position - self._fov_scale / 2.0),
           geometry.Point(silicon_position + self._fov_scale / 2.0),
       )
+      for observer in self._observers:
+        observer.observe_fov_change(self._fov)
       observed_grid, image_time = self._get_observed_grid_and_elapsed_time()
       elapsed_time += image_time
 

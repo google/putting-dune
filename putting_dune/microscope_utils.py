@@ -518,6 +518,9 @@ class SimulatorObserver:
   ) -> None:
     pass
 
+  def observe_fov_change(self, fov: MicroscopeFieldOfView) -> None:
+    pass
+
   def observe_take_image(
       self,
       duration: dt.timedelta,
