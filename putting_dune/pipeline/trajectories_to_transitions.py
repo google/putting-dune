@@ -34,11 +34,19 @@ class Args:
 
 def trajectories_to_transitions(
     trajectories: list[microscope_utils.Trajectory],
+    *,
+    previous_controls_at_current_timestep: bool = False,
 ) -> list[microscope_utils.Transition]:
   """Extracts adjacent observations from trajectories to form transitions.
 
   Args:
     trajectories: List of trajectories (as Python objects, not protobuf format).
+    previous_controls_at_current_timestep: This flag determines whether an
+      observation is labelled as (s_t, a_t) or (s_t, a_{t-1}). If
+      `previous_controls_at_current_timestep` is true this means that the
+      trajectory is in (s_t, a_{t-1}) form. The main place to watch out for this
+      is when collecting data from the simulator which is in (s_t, a_{t-1})
+      versus data from the real microscope which is (s_t, a_t).
 
   Returns:
     List of extracted transitions.
@@ -71,7 +79,9 @@ def trajectories_to_transitions(
                 grid_after=grid_after,
                 fov_before=fov_before,
                 fov_after=fov_after,
-                controls=controls_before,
+                controls=controls_before
+                if not previous_controls_at_current_timestep
+                else controls,
                 image_before=image_before,
                 image_after=image_after,
                 label_image_before=label_image_before,

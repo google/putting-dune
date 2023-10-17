@@ -86,6 +86,7 @@ class Args:
   dropout_rate: float = 0.0
   class_loss_weight: float = 0.1
   rate_loss_weight: float = 1.0
+  previous_controls_at_current_timestep: bool = False
 
   learner_type: str = 'rate_network'
 
@@ -653,7 +654,8 @@ def load_trajectories_from_records(
 def main(args: Args) -> None:
   trajectories = load_trajectories_from_records(args.source_path)
   transitions = trajectories_to_transitions.trajectories_to_transitions(
-      trajectories
+      trajectories,
+      previous_controls_at_current_timestep=args.previous_controls_at_current_timestep,
   )
   processed_transitions = transitions_to_datapoints(
       transitions,
