@@ -36,7 +36,7 @@ class Args:
 
   source_path: epath.Path
   target_path: epath.Path
-  aligner_url: str
+  aligner_path: epath.Path
   history_length: int = 5
   alignment_iterations: int = 1
   base_step_size: float = 1
@@ -101,8 +101,8 @@ def main(args: Args) -> None:
     trajectories.extend(pdio.read_records(file, microscope_utils.Trajectory))
 
   with tempfile.TemporaryDirectory() as tmpdir:
-    aligner = alignment.ImageAligner.from_url(
-        args.aligner_url, workdir=tmpdir, hybrid=args.hybrid
+    aligner = alignment.ImageAligner.from_path(
+        args.aligner_path, workdir=tmpdir, hybrid=args.hybrid
     )
 
     aligned_trajectories = []

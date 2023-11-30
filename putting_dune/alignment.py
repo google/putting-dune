@@ -17,10 +17,8 @@
 import collections
 import copy
 import functools
-import io
 import typing
 from typing import Any, Deque, Optional, Sequence, Tuple
-import urllib
 import zipfile
 
 import cv2
@@ -460,9 +458,9 @@ class ImageAligner:
     return microscope_utils.AtomicGridMicroscopeFrame(grid)
 
   @classmethod
-  def from_url(
+  def from_path(
       cls,
-      url: str = 'https://storage.googleapis.com/spr_data_bucket_public/alignment/20230403-image-aligner.zip',
+      path: epath.Path,
       workdir: Optional[str] = None,
       reload: bool = False,
       **kwargs,
@@ -470,9 +468,9 @@ class ImageAligner:
     """Construct model from URL.
 
     Args:
-      url: Model URL, expected to be a zip file.
+      path: Model path, expected to be a zip file.
       workdir: Optional, locatioon (e.g., temp dir) to extract weights to.
-      reload: Optional, whether to force-redownload aligner.
+      reload: Optional, whether to force-reload the aligner.
       **kwargs: Optional arguments for the ImageAligner.
 
     Returns:
@@ -484,8 +482,8 @@ class ImageAligner:
     model_path = epath.Path(workdir) / 'model_weights' / 'image-alignment-model'
     if not model_path.exists() or reload:
       model_path.mkdir(parents=True, exist_ok=True)
-      with urllib.request.urlopen(url) as request:
-        with zipfile.ZipFile(io.BytesIO(request.read())) as model_zip:
+      with path.open('rb') as model_zip_fp:
+        with zipfile.ZipFile(model_zip_fp) as model_zip:
           model_zip.extractall(model_path.parent)
 
     return ImageAligner(model_path=model_path, **kwargs)
