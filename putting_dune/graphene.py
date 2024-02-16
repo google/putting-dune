@@ -224,7 +224,7 @@ class HumanPriorRatePredictor:
       rate = single_silicon_prior_rates(
           relative_beam_position, rotated_mean, self.cov, self.max_rate
       )
-      rates[i] = rate
+      rates[i] = np.asarray(rate)
 
     return rates
 
