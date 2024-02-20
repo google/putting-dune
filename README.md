@@ -2,6 +2,7 @@
 
 [![Unittests](https://github.com/google/putting-dune/actions/workflows/pytest_and_autopublish.yml/badge.svg)](https://github.com/google/putting-dune/actions/workflows/pytest_and_autopublish.yml)
 [![PyPI version](https://badge.fury.io/py/putting_dune.svg)](https://badge.fury.io/py/putting_dune)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10626248.svg)](https://doi.org/10.5281/zenodo.10626248)
 
 This repository contains the code of the paper ["Learning and Controlling Silicon Dopant Transitions in Graphene using Scanning Transmission Electron Microscopy"](https://arxiv.org/abs/2311.17894).
 The so-called Putting Dune, provides the simulator and methods to learn transition rates of 3-fold silicon-doped graphene.
